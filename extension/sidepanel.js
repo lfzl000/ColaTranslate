@@ -51,9 +51,13 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () 
 
 // Settings modal
 settingsBtn.addEventListener('click', () => {
-    document.querySelectorAll('.settings-option').forEach(opt => {
+    document.querySelectorAll('.settings-option[data-theme]').forEach(opt => {
         opt.classList.toggle('active', opt.dataset.theme === currentTheme);
     });
+    const cfg = loadProviderConfig(currentProvider);
+    currentApiBase = cfg.apiBase;
+    currentApiKey = cfg.apiKey;
+    currentModel = cfg.model;
     apiKeyInput.value = currentApiKey;
     document.getElementById('apiBaseInput').value = currentApiBase;
     document.getElementById('modelInput').value = currentModel;
@@ -128,7 +132,22 @@ settingsOverlay.addEventListener('click', (e) => {
     if (e.target === settingsOverlay) settingsOverlay.style.display = 'none';
     // Provider option click
     const popt = e.target.closest('#providerOptions .settings-option');
-    if (popt) { currentProvider = popt.dataset.provider; updateProviderUI(); return; }
+    if (popt) {
+        currentProvider = popt.dataset.provider;
+        const cfg = loadProviderConfig(currentProvider);
+        currentApiBase = cfg.apiBase;
+        currentApiKey = cfg.apiKey;
+        currentModel = cfg.model;
+        apiKeyInput.value = currentApiKey;
+        document.getElementById('apiBaseInput').value = currentApiBase;
+        document.getElementById('modelInput').value = currentModel;
+        document.getElementById('modelSelect').style.display = 'none';
+        document.getElementById('modelInput').style.display = '';
+        document.getElementById('modelHint').style.display = 'none';
+        updateProviderUI();
+        updateApiKeyHint();
+        return;
+    }
     // Theme option click
     const topt = e.target.closest('.settings-option');
     if (topt && topt.dataset.theme) {
@@ -172,10 +191,8 @@ settingsSave.addEventListener('click', () => {
     currentApiKey = newKey;
     currentApiBase = newBase;
     currentModel = newModel;
+    saveProviderConfig(currentProvider, newKey, newBase, newModel);
     localStorage.setItem('ai-translator-provider', currentProvider);
-    localStorage.setItem('ai-translator-api-key', currentApiKey);
-    localStorage.setItem('ai-translator-api-base', currentApiBase);
-    localStorage.setItem('ai-translator-model', currentModel);
     localStorage.setItem('ai-translator-theme', newTheme);
 
     applyTheme(newTheme);
@@ -380,9 +397,35 @@ async function translate() {
 }
 
 // ====== API Config ======
-let currentApiBase = localStorage.getItem('ai-translator-api-base') || 'https://api.deepseek.com/v1';
-let currentApiKey = localStorage.getItem('ai-translator-api-key') || '';
-let currentModel = localStorage.getItem('ai-translator-model') || 'deepseek-v4-flash';
+function loadProviderConfig(provider) {
+    if (provider === 'openai') {
+        return {
+            apiBase: localStorage.getItem('ai-openai-api-base') || 'https://api.openai.com/v1',
+            apiKey: localStorage.getItem('ai-openai-api-key') || '',
+            model: localStorage.getItem('ai-openai-model') || 'gpt-4o-mini'
+        };
+    }
+    return {
+        apiBase: 'https://api.deepseek.com/v1',
+        apiKey: localStorage.getItem('ai-deepseek-api-key') || '',
+        model: 'deepseek-v4-flash'
+    };
+}
+
+function saveProviderConfig(provider, apiKey, apiBase, model) {
+    if (provider === 'openai') {
+        localStorage.setItem('ai-openai-api-base', apiBase);
+        localStorage.setItem('ai-openai-api-key', apiKey);
+        localStorage.setItem('ai-openai-model', model);
+    } else {
+        localStorage.setItem('ai-deepseek-api-key', apiKey);
+    }
+}
+
+const defaultCfg = loadProviderConfig('deepseek');
+let currentApiBase = defaultCfg.apiBase;
+let currentApiKey = defaultCfg.apiKey;
+let currentModel = defaultCfg.model;
 
 function getApiUrl() {
     const base = currentApiBase.replace(/\/+$/, '');
