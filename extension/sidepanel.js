@@ -70,7 +70,58 @@ function updateProviderUI() {
     });
     document.getElementById('apiBaseGroup').style.display = isOpenAI ? '' : 'none';
     document.getElementById('modelGroup').style.display = isOpenAI ? '' : 'none';
+    document.getElementById('fetchModelsBtn').style.display = isOpenAI ? '' : 'none';
+    document.getElementById('modelSelect').style.display = 'none';
+    document.getElementById('modelInput').style.display = '';
 }
+
+// Fetch available models from API
+document.getElementById('fetchModelsBtn').addEventListener('click', async () => {
+    const base = document.getElementById('apiBaseInput').value.trim().replace(/\/+$/, '');
+    const key = apiKeyInput.value.trim();
+    if (!base) { showToast('请先填写 API 请求地址', 'error'); return; }
+    if (!key) { showToast('请先填写 API Key', 'error'); return; }
+
+    const btn = document.getElementById('fetchModelsBtn');
+    const hint = document.getElementById('modelHint');
+    btn.classList.add('loading');
+    btn.textContent = '⏳ 获取中...';
+    hint.style.display = 'none';
+
+    try {
+        const res = await fetch(`${base}/models`, {
+            headers: { 'Authorization': `Bearer ${key}` }
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const models = (data.data || []).map(m => m.id).filter(id => !id.includes('embedding') && !id.includes('moderation')).slice(0, 20);
+
+        if (models.length) {
+            const select = document.getElementById('modelSelect');
+            select.innerHTML = models.map(m => `<option value="${m}">${m}</option>`).join('');
+            select.style.display = '';
+            document.getElementById('modelInput').style.display = 'none';
+            select.addEventListener('change', () => {
+                document.getElementById('modelInput').value = select.value;
+            });
+            select.value = models[0];
+            document.getElementById('modelInput').value = models[0];
+            hint.textContent = `✅ 找到 ${models.length} 个可用模型`;
+            hint.style.color = 'var(--success)';
+        } else {
+            hint.textContent = '⚠️ 未找到可用模型，请手动输入';
+            hint.style.color = 'var(--danger)';
+        }
+        hint.style.display = '';
+    } catch (err) {
+        hint.textContent = `❌ 获取失败: ${err.message}`;
+        hint.style.color = 'var(--danger)';
+        hint.style.display = '';
+    } finally {
+        btn.classList.remove('loading');
+        btn.textContent = '🔄 获取可用模型';
+    }
+});
 
 settingsClose.addEventListener('click', () => { settingsOverlay.style.display = 'none'; });
 settingsOverlay.addEventListener('click', (e) => {

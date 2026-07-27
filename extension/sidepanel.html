@@ -1080,8 +1080,13 @@ body::before {
             </div>
             <div class="settings-group" id="modelGroup" style="display:none">
                 <label class="settings-label">🤖 模型名称</label>
-                <input type="text" class="settings-input" id="modelInput"
-                    placeholder="gpt-4o-mini">
+                <div style="display:flex;gap:0.5rem">
+                    <select class="settings-input" id="modelSelect" style="flex:1;display:none"></select>
+                    <input type="text" class="settings-input" id="modelInput" style="flex:1"
+                        placeholder="gpt-4o-mini">
+                </div>
+                <button class="settings-fetch-btn" id="fetchModelsBtn" style="display:none">🔄 获取可用模型</button>
+                <div class="settings-hint" id="modelHint" style="display:none"></div>
             </div>
             <div class="settings-group">
                 <label class="settings-label">🔑 API Key</label>

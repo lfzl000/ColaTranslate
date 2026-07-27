@@ -716,6 +716,20 @@ body::before {
 }
 .settings-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-glow); }
 .settings-hint { font-size: 0.72rem; color: var(--text-secondary); }
+.settings-fetch-btn {
+    width: 100%;
+    padding: 0.45rem;
+    border-radius: 8px;
+    border: 1px dashed var(--border);
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: all var(--transition);
+    margin-top: 0.3rem;
+}
+.settings-fetch-btn:hover { border-color: var(--primary); color: var(--primary); }
+.settings-fetch-btn.loading { opacity: 0.6; pointer-events: none; }
 .settings-footer {
     padding: 1rem 1.5rem;
     border-top: 1px solid var(--border);
@@ -1082,8 +1096,13 @@ body::before {
             </div>
             <div class="settings-group" id="modelGroup" style="display:none">
                 <label class="settings-label">🤖 模型名称</label>
-                <input type="text" class="settings-input" id="modelInput"
-                    placeholder="gpt-4o-mini">
+                <div style="display:flex;gap:0.5rem">
+                    <select class="settings-input" id="modelSelect" style="flex:1;display:none"></select>
+                    <input type="text" class="settings-input" id="modelInput" style="flex:1"
+                        placeholder="gpt-4o-mini">
+                </div>
+                <button class="settings-fetch-btn" id="fetchModelsBtn" style="display:none">🔄 获取可用模型</button>
+                <div class="settings-hint" id="modelHint" style="display:none"></div>
             </div>
             <div class="settings-group">
                 <label class="settings-label">🔑 API Key</label>
@@ -1180,7 +1199,58 @@ function updateProviderUI() {
     });
     document.getElementById('apiBaseGroup').style.display = isOpenAI ? '' : 'none';
     document.getElementById('modelGroup').style.display = isOpenAI ? '' : 'none';
+    document.getElementById('fetchModelsBtn').style.display = isOpenAI ? '' : 'none';
+    document.getElementById('modelSelect').style.display = 'none';
+    document.getElementById('modelInput').style.display = '';
 }
+
+// Fetch available models from API
+document.getElementById('fetchModelsBtn').addEventListener('click', async () => {
+    const base = document.getElementById('apiBaseInput').value.trim().replace(/\/+$/, '');
+    const key = apiKeyInput.value.trim();
+    if (!base) { showToast('请先填写 API 请求地址', 'error'); return; }
+    if (!key) { showToast('请先填写 API Key', 'error'); return; }
+
+    const btn = document.getElementById('fetchModelsBtn');
+    const hint = document.getElementById('modelHint');
+    btn.classList.add('loading');
+    btn.textContent = '⏳ 获取中...';
+    hint.style.display = 'none';
+
+    try {
+        const res = await fetch(`${base}/models`, {
+            headers: { 'Authorization': `Bearer ${key}` }
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const models = (data.data || []).map(m => m.id).filter(id => !id.includes('embedding') && !id.includes('moderation')).slice(0, 20);
+
+        if (models.length) {
+            const select = document.getElementById('modelSelect');
+            select.innerHTML = models.map(m => `<option value="${m}">${m}</option>`).join('');
+            select.style.display = '';
+            document.getElementById('modelInput').style.display = 'none';
+            select.addEventListener('change', () => {
+                document.getElementById('modelInput').value = select.value;
+            });
+            select.value = models[0];
+            document.getElementById('modelInput').value = models[0];
+            hint.textContent = `✅ 找到 ${models.length} 个可用模型`;
+            hint.style.color = 'var(--success)';
+        } else {
+            hint.textContent = '⚠️ 未找到可用模型，请手动输入';
+            hint.style.color = 'var(--danger)';
+        }
+        hint.style.display = '';
+    } catch (err) {
+        hint.textContent = `❌ 获取失败: ${err.message}`;
+        hint.style.color = 'var(--danger)';
+        hint.style.display = '';
+    } finally {
+        btn.classList.remove('loading');
+        btn.textContent = '🔄 获取可用模型';
+    }
+});
 
 // Provider option click
 settingsOverlay.addEventListener('click', (e) => {
