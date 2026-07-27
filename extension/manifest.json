@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "description": "基于 DeepSeek 的智能翻译与代码命名助手",
   "permissions": ["sidePanel", "storage"],
-  "host_permissions": ["https://api.deepseek.com/*"],
+  "host_permissions": ["<all_urls>"],
   "side_panel": {
     "default_path": "sidepanel.html"
   },
@@ -20,6 +20,6 @@
     "service_worker": "background.js"
   },
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; connect-src https://api.deepseek.com; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:"
+    "extension_pages": "script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src http://* https://* ws://* wss://*"
   }
 }
