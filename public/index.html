@@ -1,0 +1,1581 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>可乐翻译助手 - 基于 DeepSeek</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'><defs><radialGradient id='g' cx='45%' cy='40%'><stop offset='0%' stop-color='%23FFE08A'/><stop offset='100%' stop-color='%23E8A830'/></radialGradient></defs><rect width='128' height='128' rx='28' fill='%234FC3F7'/><ellipse cx='56' cy='30' rx='22' ry='14' fill='%23D4A020'/><ellipse cx='88' cy='32' rx='18' ry='12' fill='%23D4A020'/><ellipse cx='74' cy='52' rx='40' ry='36' fill='url(%23g)'/><ellipse cx='60' cy='36' rx='10' ry='10' fill='%23fff'/><ellipse cx='88' cy='36' rx='10' ry='10' fill='%23fff'/><circle cx='61' cy='37' r='5' fill='%23222'/><circle cx='89' cy='37' r='5' fill='%23222'/><circle cx='62' cy='35' r='1.8' fill='%23fff'/><circle cx='90' cy='35' r='1.8' fill='%23fff'/><ellipse cx='74' cy='56' rx='10' ry='6' fill='%23E8A830'/><ellipse cx='74' cy='63' rx='6' ry='4' fill='%23222'/><path d='M54 55 Q74 48 94 55' stroke='%23222' stroke-width='2' fill='none'/><ellipse cx='74' cy='67' rx='8' ry='5' fill='%23FF6B8A'/><ellipse cx='44' cy='20' rx='14' ry='24' fill='url(%23g)' transform='rotate(-25 44 20)'/><ellipse cx='108' cy='22' rx='14' ry='24' fill='url(%23g)' transform='rotate(25 108 22)'/></svg>">
+<style>
+/* ====== CSS Variables & Theme ====== */
+:root {
+    --bg: #f0f2f5;
+    --surface: #ffffff;
+    --surface-hover: #f8f9fb;
+    --text: #1a1a2e;
+    --text-secondary: #6b7280;
+    --border: #e5e7eb;
+    --primary: #4f46e5;
+    --primary-light: #818cf8;
+    --primary-glow: rgba(79, 70, 229, 0.15);
+    --accent: #06b6d4;
+    --success: #10b981;
+    --danger: #ef4444;
+    --glass-bg: rgba(255,255,255,0.7);
+    --glass-border: rgba(255,255,255,0.4);
+    --glass-shadow: 0 8px 32px rgba(0,0,0,0.06);
+    --gradient-1: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --gradient-2: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    --radius: 16px;
+    --radius-sm: 10px;
+    --transition: 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-theme="dark"] {
+    --bg: #0f0f1a;
+    --surface: #1a1a2e;
+    --surface-hover: #222240;
+    --text: #e8e8f0;
+    --text-secondary: #9ca3af;
+    --border: #2a2a4a;
+    --primary: #818cf8;
+    --primary-light: #a5b4fc;
+    --primary-glow: rgba(129, 140, 248, 0.2);
+    --glass-bg: rgba(26,26,46,0.7);
+    --glass-border: rgba(255,255,255,0.08);
+    --glass-shadow: 0 8px 32px rgba(0,0,0,0.3);
+}
+
+/* ====== Base Styles ====== */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background var(--transition), color var(--transition);
+    overflow-x: hidden;
+}
+
+/* Animated background */
+body::before {
+    content: '';
+    position: fixed;
+    top: -50%; left: -50%;
+    width: 200%; height: 200%;
+    background:
+        radial-gradient(circle at 20% 80%, var(--primary-glow) 0%, transparent 50%),
+        radial-gradient(circle at 80% 20%, rgba(6, 182, 212, 0.08) 0%, transparent 50%);
+    animation: bgFloat 20s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 0;
+}
+
+@keyframes bgFloat {
+    0%, 100% { transform: translate(0, 0) rotate(0deg); }
+    33% { transform: translate(2%, -1%) rotate(1deg); }
+    66% { transform: translate(-1%, 1%) rotate(-1deg); }
+}
+
+/* ====== Main Container ====== */
+.main-container {
+    position: relative;
+    z-index: 1;
+    width: 90%;
+    max-width: 900px;
+    margin: 2rem;
+}
+
+/* ====== Header ====== */
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.logo-icon {
+    width: 44px; height: 44px;
+    background: var(--gradient-1);
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 1.4rem;
+    box-shadow: 0 4px 15px rgba(79, 70, 229, 0.35);
+}
+
+.logo-text { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.5px; }
+.logo-sub { font-size: 0.75rem; color: var(--text-secondary); font-weight: 500; }
+
+/* ====== Theme Toggle ====== */
+.theme-toggle {
+    width: 42px; height: 42px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    background: var(--surface);
+    cursor: pointer;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition);
+}
+.theme-toggle:hover {
+    border-color: var(--primary);
+    box-shadow: 0 0 20px var(--primary-glow);
+    transform: rotate(15deg);
+}
+
+/* ====== Translator Card ====== */
+.translator-card {
+    background: var(--glass-bg);
+    backdrop-filter: blur(30px) saturate(180%);
+    -webkit-backdrop-filter: blur(30px) saturate(180%);
+    border: 1px solid var(--glass-border);
+    border-radius: 24px;
+    box-shadow: var(--glass-shadow);
+    overflow: hidden;
+    transition: all var(--transition);
+}
+
+/* ====== Language Bar ====== */
+.lang-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+}
+
+.lang-select {
+    flex: 1;
+    min-width: 130px;
+    padding: 0.65rem 0.75rem;
+    border-radius: var(--radius-sm);
+    border: 2px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition);
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%236b7280'%3E%3Cpath d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 32px;
+}
+.lang-select:hover, .lang-select:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-glow);
+    outline: none;
+}
+
+.swap-btn {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    background: var(--surface);
+    cursor: pointer;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition);
+    flex-shrink: 0;
+}
+.swap-btn:hover {
+    border-color: var(--primary);
+    background: var(--primary);
+    color: #fff;
+    transform: rotate(180deg);
+    box-shadow: 0 4px 15px var(--primary-glow);
+}
+
+/* ====== Style Selector ====== */
+.style-bar {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0 1.5rem 1rem;
+    flex-wrap: wrap;
+}
+
+.style-chip {
+    padding: 0.4rem 0.85rem;
+    border-radius: 20px;
+    border: 2px solid var(--border);
+    background: var(--surface);
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition);
+}
+.style-chip:hover { border-color: var(--primary-light); color: var(--text); }
+.style-chip.active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #fff;
+    box-shadow: 0 2px 10px var(--primary-glow);
+}
+
+/* ====== Text Areas ====== */
+.text-areas {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: var(--border);
+}
+
+@media (max-width: 680px) {
+    .text-areas { grid-template-columns: 1fr; }
+}
+
+.text-panel {
+    background: var(--surface);
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    transition: background var(--transition);
+}
+
+.text-input, .text-output {
+    width: 100%;
+    min-height: 200px;
+    max-height: 400px;
+    border: none;
+    outline: none;
+    resize: vertical;
+    font-size: 1rem;
+    line-height: 1.7;
+    color: var(--text);
+    background: transparent;
+    font-family: inherit;
+    transition: color var(--transition);
+}
+.text-input::placeholder { color: var(--text-secondary); opacity: 0.6; }
+.text-output { cursor: default; }
+
+.char-count {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-top: auto;
+    padding-top: 0.75rem;
+    text-align: right;
+}
+
+/* ====== Action Bar ====== */
+.actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--border);
+}
+
+.action-btn {
+    padding: 0.6rem 1rem;
+    border-radius: var(--radius-sm);
+    border: 2px solid var(--border);
+    background: var(--surface);
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+.action-btn:hover {
+    border-color: var(--primary-light);
+    color: var(--primary);
+}
+
+.translate-btn {
+    margin-left: auto;
+    padding: 0.7rem 2rem;
+    background: var(--gradient-1);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    box-shadow: 0 4px 15px rgba(79, 70, 229, 0.3);
+}
+.translate-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(79, 70, 229, 0.4);
+}
+.translate-btn:active { transform: translateY(0); }
+.translate-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* ====== Spinner ====== */
+.spinner {
+    width: 18px; height: 18px;
+    border: 2.5px solid rgba(255,255,255,0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    display: none;
+}
+.translate-btn.loading .spinner { display: block; }
+.translate-btn.loading .btn-text { display: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ====== Toast ====== */
+.toast {
+    position: fixed;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    padding: 0.8rem 1.5rem;
+    border-radius: 30px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text);
+    z-index: 100;
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    pointer-events: none;
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+.toast.success { border-color: var(--success); color: var(--success); }
+.toast.error { border-color: var(--danger); color: var(--danger); }
+
+/* ====== Footer ====== */
+.footer {
+    text-align: center;
+    margin-top: 1rem;
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    opacity: 0.7;
+}
+
+/* ====== Streaming effect ====== */
+.streaming-cursor::after {
+    content: '▍';
+    animation: blink 1s step-end infinite;
+    color: var(--primary);
+}
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ====== Mode Tabs ====== */
+.mode-tabs {
+    display: flex;
+    gap: 0.25rem;
+    padding: 0.4rem;
+    background: var(--surface);
+    border-radius: 14px;
+    margin-bottom: 1rem;
+    border: 1px solid var(--border);
+}
+.mode-tab {
+    flex: 1;
+    padding: 0.65rem 1rem;
+    border-radius: 10px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+}
+.mode-tab:hover { color: var(--text); }
+.mode-tab.active {
+    background: var(--primary);
+    color: #fff;
+    box-shadow: 0 2px 10px var(--primary-glow);
+}
+
+/* ====== Naming Card ====== */
+.naming-card {
+    background: var(--glass-bg);
+    backdrop-filter: blur(30px) saturate(180%);
+    -webkit-backdrop-filter: blur(30px) saturate(180%);
+    border: 1px solid var(--glass-border);
+    border-radius: 24px;
+    box-shadow: var(--glass-shadow);
+    overflow: hidden;
+    display: none;
+}
+.naming-card.active { display: block; }
+
+.naming-input-area {
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--border);
+}
+.naming-input {
+    width: 100%;
+    padding: 0.9rem 1.2rem;
+    border-radius: var(--radius-sm);
+    border: 2px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 1rem;
+    font-family: inherit;
+    transition: all var(--transition);
+    outline: none;
+}
+.naming-input:hover, .naming-input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-glow);
+}
+.naming-input::placeholder { color: var(--text-secondary); opacity: 0.6; }
+
+.naming-results {
+    padding: 1.5rem;
+    display: grid;
+    gap: 0.75rem;
+}
+.naming-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: all var(--transition);
+}
+.naming-row:hover { border-color: var(--primary-light); }
+.naming-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--primary);
+    background: var(--primary-glow);
+    padding: 0.25rem 0.6rem;
+    border-radius: 6px;
+    white-space: nowrap;
+    min-width: 80px;
+    text-align: center;
+}
+.naming-value {
+    flex: 1;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+    font-size: 0.95rem;
+    color: var(--text);
+    word-break: break-all;
+}
+.naming-copy-btn {
+    padding: 0.35rem 0.65rem;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all var(--transition);
+    white-space: nowrap;
+}
+.naming-copy-btn:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+.naming-explanation {
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-sm);
+    background: rgba(6, 182, 212, 0.06);
+    border: 1px solid rgba(6, 182, 212, 0.15);
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+.naming-placeholder {
+    text-align: center;
+    padding: 3rem 1.5rem;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    opacity: 0.5;
+}
+
+/* ====== Candidate Cards ====== */
+.candidate-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 1rem;
+    transition: all var(--transition);
+    cursor: pointer;
+}
+.candidate-card:hover {
+    border-color: var(--primary-light);
+    box-shadow: 0 4px 16px var(--primary-glow);
+}
+.candidate-card.selected {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px var(--primary-glow);
+    background: var(--primary-glow);
+}
+.candidate-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.6rem;
+}
+.candidate-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 0.2rem 0.55rem;
+    border-radius: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.candidate-label.recommend {
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--success);
+}
+.candidate-label.alt {
+    background: var(--primary-glow);
+    color: var(--primary);
+}
+.candidate-casings {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-bottom: 0.5rem;
+}
+.casing-chip {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.3rem 0.55rem;
+    border-radius: 6px;
+    background: rgba(0,0,0,0.03);
+    border: 1px solid var(--border);
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: all var(--transition);
+}
+.casing-chip:hover {
+    border-color: var(--primary);
+    background: var(--primary-glow);
+}
+[data-theme="dark"] .casing-chip {
+    background: rgba(255,255,255,0.04);
+}
+.casing-chip .case-type {
+    font-size: 0.6rem;
+    color: var(--text-secondary);
+    font-family: inherit;
+}
+.casing-chip.copied {
+    border-color: var(--success);
+    color: var(--success);
+}
+.candidate-explanation {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+/* ====== Format Selector ====== */
+.format-selector {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.6rem;
+    flex-wrap: wrap;
+}
+.format-label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-right: 0.25rem;
+}
+.format-chip {
+    padding: 0.3rem 0.6rem;
+    border-radius: 14px;
+    border: 1.5px solid var(--border);
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.72rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition);
+}
+.format-chip:hover {
+    border-color: var(--primary-light);
+    color: var(--text);
+}
+.format-chip.active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #fff;
+}
+
+/* ====== Settings Modal ====== */
+.settings-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    backdrop-filter: blur(6px);
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.2s ease;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.settings-modal {
+    background: var(--surface);
+    border-radius: 20px;
+    width: 90%;
+    max-width: 420px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    overflow: hidden;
+    animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes slideUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.settings-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+}
+.settings-header h3 { font-size: 1.1rem; font-weight: 700; }
+.settings-close {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.settings-close:hover { background: var(--border); color: var(--text); }
+.settings-body { padding: 1.25rem 1.5rem; display: grid; gap: 1.25rem; }
+.settings-group { display: grid; gap: 0.5rem; }
+.settings-label { font-size: 0.85rem; font-weight: 600; color: var(--text); }
+.settings-options { display: flex; gap: 0.4rem; }
+.settings-option {
+    flex: 1;
+    padding: 0.55rem 0.5rem;
+    border-radius: 10px;
+    border: 2px solid var(--border);
+    background: var(--surface);
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition);
+    text-align: center;
+}
+.settings-option:hover { border-color: var(--primary-light); }
+.settings-option.active {
+    border-color: var(--primary);
+    background: var(--primary-glow);
+    color: var(--primary);
+    font-weight: 600;
+}
+.settings-input {
+    width: 100%;
+    padding: 0.65rem 0.85rem;
+    border-radius: 10px;
+    border: 2px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 0.85rem;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    outline: none;
+    transition: all var(--transition);
+}
+.settings-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-glow); }
+.settings-hint { font-size: 0.72rem; color: var(--text-secondary); }
+.settings-footer {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: flex-end;
+}
+.settings-save {
+    padding: 0.6rem 1.5rem;
+    border-radius: 10px;
+    border: none;
+    background: var(--gradient-1);
+    color: #fff;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition);
+    box-shadow: 0 4px 12px var(--primary-glow);
+}
+.settings-save:hover { transform: translateY(-1px); box-shadow: 0 6px 20px var(--primary-glow); }
+</style>
+</head>
+<body data-theme="light">
+
+<div class="main-container">
+    <!-- Header -->
+    <div class="header">
+        <div class="logo">
+            <div class="logo-icon">
+                <svg width="28" height="28" viewBox="0 0 64 64" style="display:block">
+                    <ellipse cx="38" cy="36" rx="22" ry="20" fill="#F5C842"/>
+                    <ellipse cx="30" cy="28" rx="6" ry="6" fill="#fff"/>
+                    <ellipse cx="46" cy="28" rx="6" ry="6" fill="#fff"/>
+                    <circle cx="31" cy="29" r="3" fill="#222"/>
+                    <circle cx="45" cy="29" r="3" fill="#222"/>
+                    <ellipse cx="38" cy="38" rx="5" ry="3" fill="#E8A830"/>
+                    <ellipse cx="38" cy="43" rx="4" ry="3" fill="#222"/>
+                    <path d="M34 40 Q38 36 42 40" stroke="#222" stroke-width="1.5" fill="none"/>
+                    <ellipse cx="38" cy="46" rx="5" ry="3" fill="#FF6B8A"/>
+                    <ellipse cx="18" cy="18" rx="10" ry="16" fill="#F5C842" transform="rotate(-20 18 18)"/>
+                    <ellipse cx="58" cy="18" rx="10" ry="16" fill="#F5C842" transform="rotate(20 58 18)"/>
+                </svg>
+            </div>
+            <div>
+                <div class="logo-text">可乐翻译助手</div>
+                <div class="logo-sub">基于 DeepSeek · 智能翻译</div>
+            </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.5rem">
+            <button class="theme-toggle" id="settingsBtn" title="设置">⚙️</button>
+        </div>
+    </div>
+
+    <!-- Mode Tabs -->
+    <div class="mode-tabs">
+        <button class="mode-tab active" data-mode="translate">🌐 翻译</button>
+        <button class="mode-tab" data-mode="naming">💻 代码命名</button>
+    </div>
+
+    <!-- Translator Card -->
+    <div class="translator-card">
+        <!-- Language Selectors -->
+        <div class="lang-bar">
+            <select class="lang-select" id="sourceLang">
+                <option value="auto">🌍 自动检测语言</option>
+                <option value="zh">🇨🇳 中文</option>
+                <option value="en">🇺🇸 English</option>
+                <option value="ja">🇯🇵 日本語</option>
+                <option value="ko">🇰🇷 한국어</option>
+                <option value="fr">🇫🇷 Français</option>
+                <option value="de">🇩🇪 Deutsch</option>
+                <option value="es">🇪🇸 Español</option>
+                <option value="pt">🇵🇹 Português</option>
+                <option value="ru">🇷🇺 Русский</option>
+                <option value="ar">🇸🇦 العربية</option>
+                <option value="th">🇹🇭 ไทย</option>
+                <option value="vi">🇻🇳 Tiếng Việt</option>
+                <option value="it">🇮🇹 Italiano</option>
+                <option value="nl">🇳🇱 Nederlands</option>
+                <option value="pl">🇵🇱 Polski</option>
+            </select>
+            <button class="swap-btn" id="swapBtn" title="交换语言">⇄</button>
+            <select class="lang-select" id="targetLang">
+                <option value="zh">🇨🇳 中文</option>
+                <option value="en" selected>🇺🇸 English</option>
+                <option value="ja">🇯🇵 日本語</option>
+                <option value="ko">🇰🇷 한국어</option>
+                <option value="fr">🇫🇷 Français</option>
+                <option value="de">🇩🇪 Deutsch</option>
+                <option value="es">🇪🇸 Español</option>
+                <option value="pt">🇵🇹 Português</option>
+                <option value="ru">🇷🇺 Русский</option>
+                <option value="ar">🇸🇦 العربية</option>
+                <option value="th">🇹🇭 ไทย</option>
+                <option value="vi">🇻🇳 Tiếng Việt</option>
+                <option value="it">🇮🇹 Italiano</option>
+                <option value="nl">🇳🇱 Nederlands</option>
+                <option value="pl">🇵🇱 Polski</option>
+            </select>
+        </div>
+
+        <!-- Style Selector -->
+        <div class="style-bar">
+            <button class="style-chip active" data-style="auto">🎯 自动</button>
+            <button class="style-chip" data-style="formal">💼 正式</button>
+            <button class="style-chip" data-style="casual">💬 口语</button>
+            <button class="style-chip" data-style="academic">📚 学术</button>
+            <button class="style-chip" data-style="developer">💻 开发者</button>
+        </div>
+
+        <!-- Text Areas -->
+        <div class="text-areas">
+            <div class="text-panel">
+                <textarea class="text-input" id="sourceText"
+                    placeholder="输入要翻译的文本...
+支持自动检测语言，长按 Enter 换行"></textarea>
+                <div class="char-count" id="sourceCount">0 字符</div>
+            </div>
+            <div class="text-panel">
+                <div class="text-output" id="targetText"
+                    contenteditable="false"
+                    style="white-space: pre-wrap; word-break: break-word;"></div>
+                <div class="char-count" id="targetCount">0 字符</div>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="actions">
+            <button class="action-btn" id="clearBtn" title="清空">
+                <span>🗑️</span> 清空
+            </button>
+            <button class="action-btn" id="copyBtn" title="复制翻译结果">
+                <span>📋</span> 复制
+            </button>
+            <button class="action-btn" id="pasteBtn" title="粘贴剪贴板">
+                <span>📌</span> 粘贴
+            </button>
+            <button class="action-btn" id="streamToggle" title="切换流式/普通模式">
+                <span>⚡</span> 流式
+            </button>
+            <button class="translate-btn" id="translateBtn">
+                <span class="btn-text">🔄 翻译</span>
+                <span class="spinner"></span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Naming Card -->
+    <div class="naming-card" id="namingCard">
+        <div class="naming-input-area">
+            <input class="naming-input" id="namingInput"
+                placeholder="输入中文词语或短语，如：用户列表、获取数据、最大连接数..."
+                autocomplete="off">
+            <div class="format-selector" id="formatSelector" style="display:none">
+                <span class="format-label">显示格式：</span>
+                <button class="format-chip active" data-format="all">📋 全部</button>
+                <button class="format-chip" data-format="camelCase">🐫 camel</button>
+                <button class="format-chip" data-format="PascalCase">🏛️ Pascal</button>
+                <button class="format-chip" data-format="snake_case">🐍 snake</button>
+                <button class="format-chip" data-format="kebab-case">🍢 kebab</button>
+            </div>
+        </div>
+        <div class="naming-placeholder" id="namingPlaceholder">
+            👆 输入中文短语，按 Enter 获取代码命名建议
+        </div>
+        <div class="naming-results" id="namingResults" style="display:none">
+            <!-- 动态填充候选方案 -->
+        </div>
+    </div>
+
+    <div class="footer" id="pageFooter">快捷键：Ctrl+Enter 翻译 · 支持 15 种语言 · 基于 DeepSeek 大模型</div>
+</div>
+
+<!-- Settings Modal -->
+<div class="settings-overlay" id="settingsOverlay" style="display:none">
+    <div class="settings-modal">
+        <div class="settings-header">
+            <h3>⚙️ 设置</h3>
+            <button class="settings-close" id="settingsClose">✕</button>
+        </div>
+        <div class="settings-body">
+            <div class="settings-group">
+                <label class="settings-label">🎨 主题</label>
+                <div class="settings-options">
+                    <button class="settings-option active" data-theme="light">☀️ 浅色</button>
+                    <button class="settings-option" data-theme="dark">🌙 深色</button>
+                    <button class="settings-option" data-theme="system">💻 跟随系统</button>
+                </div>
+            </div>
+            <div class="settings-group">
+                <label class="settings-label">🔑 DeepSeek API Key</label>
+                <input type="password" class="settings-input" id="apiKeyInput"
+                    placeholder="sk-...">
+                <div class="settings-hint" id="apiKeyHint"></div>
+                <div class="settings-hint">
+                    获取 Key：<a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noopener" style="color:var(--primary);font-weight:500;">platform.deepseek.com/api_keys ↗</a>
+                </div>
+                <div class="settings-hint">
+                    密钥仅保存在浏览器本地，不会上传到服务器
+                </div>
+            </div>
+        </div>
+        <div class="settings-footer">
+            <button class="settings-save" id="settingsSave">保存设置</button>
+        </div>
+    </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ====== State ======
+let currentStyle = 'auto';
+let useStream = false;
+let userPickedTarget = false;  // 用户是否手动选择了目标语言
+
+// ====== DOM Elements ======
+const sourceLang = document.getElementById('sourceLang');
+const targetLang = document.getElementById('targetLang');
+const sourceText = document.getElementById('sourceText');
+const targetText = document.getElementById('targetText');
+const translateBtn = document.getElementById('translateBtn');
+const swapBtn = document.getElementById('swapBtn');
+const clearBtn = document.getElementById('clearBtn');
+const copyBtn = document.getElementById('copyBtn');
+const pasteBtn = document.getElementById('pasteBtn');
+const streamToggle = document.getElementById('streamToggle');
+const sourceCount = document.getElementById('sourceCount');
+const targetCount = document.getElementById('targetCount');
+const toast = document.getElementById('toast');
+
+// ====== Theme System ======
+const settingsOverlay = document.getElementById('settingsOverlay');
+const settingsClose = document.getElementById('settingsClose');
+const settingsSave = document.getElementById('settingsSave');
+const settingsBtn = document.getElementById('settingsBtn');
+const apiKeyInput = document.getElementById('apiKeyInput');
+const apiKeyHint = document.getElementById('apiKeyHint');
+
+let currentTheme = localStorage.getItem('ai-translator-theme') || 'system';
+let currentApiKey = localStorage.getItem('ai-translator-api-key') || '';
+
+// Apply theme (system-aware)
+function applyTheme(mode) {
+    if (mode === 'system') {
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.body.dataset.theme = prefersDark ? 'dark' : 'light';
+    } else {
+        document.body.dataset.theme = mode;
+    }
+    document.querySelectorAll('.settings-option').forEach(opt => {
+        opt.classList.toggle('active', opt.dataset.theme === mode);
+    });
+}
+
+applyTheme(currentTheme);
+
+// Listen for system theme changes
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    if (currentTheme === 'system') applyTheme('system');
+});
+
+// Settings modal
+settingsBtn.addEventListener('click', () => {
+    // Sync state
+    document.querySelectorAll('.settings-option').forEach(opt => {
+        opt.classList.toggle('active', opt.dataset.theme === currentTheme);
+    });
+    apiKeyInput.value = currentApiKey;
+    updateApiKeyHint();
+    settingsOverlay.style.display = 'flex';
+    apiKeyInput.focus();
+});
+
+settingsClose.addEventListener('click', () => { settingsOverlay.style.display = 'none'; });
+settingsOverlay.addEventListener('click', (e) => {
+    if (e.target === settingsOverlay) settingsOverlay.style.display = 'none';
+});
+
+// Theme option click
+settingsOverlay.addEventListener('click', (e) => {
+    const opt = e.target.closest('.settings-option');
+    if (!opt) return;
+    currentTheme = opt.dataset.theme;
+    document.querySelectorAll('.settings-option').forEach(o => o.classList.remove('active'));
+    opt.classList.add('active');
+});
+
+// API key hint
+apiKeyInput.addEventListener('input', updateApiKeyHint);
+function updateApiKeyHint() {
+    const val = apiKeyInput.value.trim();
+    if (!val) apiKeyHint.textContent = '';
+    else if (val.startsWith('sk-') && val.length > 20) apiKeyHint.textContent = '✅ 密钥格式正确';
+    else apiKeyHint.textContent = '⚠️ 密钥应以 sk- 开头';
+    apiKeyHint.style.color = val.startsWith('sk-') && val.length > 20 ? 'var(--success)' : 'var(--danger)';
+}
+
+// Save settings
+settingsSave.addEventListener('click', () => {
+    const newTheme = currentTheme;
+    const newKey = apiKeyInput.value.trim();
+
+    // Update API Key
+    if (newKey && !newKey.startsWith('sk-')) {
+        showToast('API Key 格式不正确，应以 sk- 开头', 'error');
+        return;
+    }
+    currentApiKey = newKey;
+    localStorage.setItem('ai-translator-api-key', currentApiKey);
+    localStorage.setItem('ai-translator-theme', newTheme);
+
+    applyTheme(newTheme);
+    settingsOverlay.style.display = 'none';
+    showToast('设置已保存 ✓', 'success');
+});
+
+// Esc to close
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && settingsOverlay.style.display === 'flex') {
+        settingsOverlay.style.display = 'none';
+    }
+});
+
+// ====== Style Chips ======
+document.querySelectorAll('.style-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+        document.querySelectorAll('.style-chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        currentStyle = chip.dataset.style;
+    });
+});
+
+// ====== Stream Toggle ======
+streamToggle.addEventListener('click', () => {
+    useStream = !useStream;
+    streamToggle.style.borderColor = useStream ? 'var(--accent)' : 'var(--border)';
+    streamToggle.style.color = useStream ? 'var(--accent)' : 'var(--text-secondary)';
+    showToast(useStream ? '流式模式：逐字输出翻译结果' : '普通模式：一次性返回翻译结果');
+});
+
+// ====== Swap Languages ======
+swapBtn.addEventListener('click', () => {
+    if (sourceLang.value === 'auto') return;
+    const tmp = sourceLang.value;
+    sourceLang.value = targetLang.value;
+    targetLang.value = tmp;
+    // Swap text if both have content
+    if (sourceText.value && targetText.textContent) {
+        const tmpText = sourceText.value;
+        sourceText.value = targetText.textContent;
+        targetText.textContent = tmpText;
+        updateCounts();
+    }
+});
+
+// ====== Clear ======
+clearBtn.addEventListener('click', () => {
+    sourceText.value = '';
+    targetText.textContent = '';
+    updateCounts();
+    sourceText.focus();
+});
+
+// ====== Copy ======
+copyBtn.addEventListener('click', async () => {
+    const text = targetText.textContent.trim();
+    if (!text) { showToast('没有可复制的内容', 'error'); return; }
+    try {
+        await navigator.clipboard.writeText(text);
+        showToast('已复制到剪贴板 ✓', 'success');
+    } catch {
+        // Fallback
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        showToast('已复制到剪贴板 ✓', 'success');
+    }
+});
+
+// ====== Paste ======
+pasteBtn.addEventListener('click', async () => {
+    try {
+        const text = await navigator.clipboard.readText();
+        if (text) {
+            sourceText.value = text;
+            updateCounts();
+            showToast('已粘贴剪贴板内容');
+        }
+    } catch {
+        showToast('无法访问剪贴板，请手动粘贴', 'error');
+    }
+});
+
+// ====== Auto-Detect Language & Switch Target ======
+let detectTimer;
+sourceText.addEventListener('input', () => {
+    updateCounts();
+    // 用户已手动选了目标语言就不再自动切换
+    if (userPickedTarget) return;
+    clearTimeout(detectTimer);
+    const text = sourceText.value.trim();
+    if (text.length < 2) return;  // 太短不检测
+    detectTimer = setTimeout(() => detectAndAutoTarget(text), 500);
+});
+
+function detectAndAutoTarget(text) {
+    if (userPickedTarget) return;
+    const lang = detectTextLanguage(text);
+    if (lang === 'zh' && targetLang.value !== 'en') {
+        targetLang.value = 'en';
+        showToast('检测到中文 → 自动切换目标语言为 English');
+    } else if (lang === 'en' && targetLang.value !== 'zh') {
+        targetLang.value = 'zh';
+        showToast('检测到 English → 自动切换目标语言为 中文');
+    }
+}
+
+function detectTextLanguage(text) {
+    let cjk = 0, latin = 0;
+    for (const ch of text) {
+        const code = ch.codePointAt(0);
+        if ((code >= 0x4E00 && code <= 0x9FFF) ||   // CJK Unified
+            (code >= 0x3400 && code <= 0x4DBF) ||    // CJK Extension A
+            (code >= 0xF900 && code <= 0xFAFF)) {     // CJK Compat
+            cjk++;
+        } else if ((code >= 0x41 && code <= 0x5A) ||  // A-Z
+                   (code >= 0x61 && code <= 0x7A)) {   // a-z
+            latin++;
+        }
+    }
+    const total = cjk + latin;
+    if (total === 0) return null;
+    if (cjk / total > 0.5) return 'zh';
+    if (latin / total > 0.5) return 'en';
+    return null;
+}
+
+// 用户手动选择目标语言时，记住选择，不再自动切换
+targetLang.addEventListener('change', () => {
+    userPickedTarget = true;
+});
+// 用户手动选择源语言（非 auto）时，也设为手动模式
+sourceLang.addEventListener('change', () => {
+    if (sourceLang.value !== 'auto') userPickedTarget = true;
+});
+
+// 清空时重置手动选择标记
+const originalClearHandler = clearBtn.onclick;
+clearBtn.addEventListener('click', () => {
+    userPickedTarget = false;
+});
+
+// ====== Char Count ======
+function updateCounts() {
+    sourceCount.textContent = `${sourceText.value.length} 字符`;
+    targetCount.textContent = `${targetText.textContent.length} 字符`;
+}
+
+// ====== Keyboard Shortcuts ======
+sourceText.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        translate();
+    }
+});
+
+// ====== Translate ======
+translateBtn.addEventListener('click', translate);
+
+async function translate() {
+    const text = sourceText.value.trim();
+    if (!text) {
+        showToast('请先输入要翻译的文本', 'error');
+        sourceText.focus();
+        return;
+    }
+
+    if (!ensureApiKey()) return;
+
+    const src = sourceLang.value;
+    const tgt = targetLang.value;
+
+    if (src !== 'auto' && src === tgt) {
+        showToast('源语言和目标语言不能相同', 'error');
+        return;
+    }
+
+    translateBtn.classList.add('loading');
+    translateBtn.disabled = true;
+    targetText.textContent = '';
+    targetText.classList.remove('streaming-cursor');
+
+    try {
+        if (useStream) {
+            await streamTranslate(text, src, tgt);
+        } else {
+            await normalTranslate(text, src, tgt);
+        }
+    } catch (err) {
+        targetText.textContent = `❌ 翻译失败: ${err.message}`;
+        showToast(`错误: ${err.message}`, 'error');
+    } finally {
+        translateBtn.classList.remove('loading');
+        translateBtn.disabled = false;
+        updateCounts();
+    }
+}
+
+// ====== DeepSeek API Helpers ======
+const DEEPSEEK_API = 'https://api.deepseek.com/v1/chat/completions';
+
+const LANG_NAMES = {
+    'zh': 'Chinese', 'en': 'English', 'ja': 'Japanese',
+    'ko': 'Korean', 'fr': 'French', 'de': 'German',
+    'es': 'Spanish', 'pt': 'Portuguese', 'ru': 'Russian',
+    'ar': 'Arabic', 'th': 'Thai', 'vi': 'Vietnamese',
+    'it': 'Italian', 'nl': 'Dutch', 'pl': 'Polish'
+};
+
+function buildTranslatePrompt(text, src, tgt, style) {
+    const srcName = LANG_NAMES[src] || src || 'Auto';
+    const tgtName = LANG_NAMES[tgt] || tgt;
+    const styleGuide = style === 'formal' ? '使用正式、专业的语气。' :
+                       style === 'casual' ? '使用口语化、自然的语气。' :
+                       style === 'academic' ? '使用学术化、严谨的语气。' :
+                       style === 'developer' ? '面向开发者场景：准确翻译编程术语、技术文档、代码注释。保留代码中的变量名、函数名、API名称不翻译。对于技术术语优先使用行业通用译法。' : '';
+    return `你是一个专业的翻译助手。请将以下文本从${srcName}翻译成${tgtName}。
+${styleGuide}
+要求：
+1. 保持原文的语义和语境
+2. 确保翻译自然流畅，符合目标语言的表达习惯
+3. 如果有专业术语，保持准确
+4. 只返回翻译结果，不要添加任何解释或说明`;
+}
+
+async function normalTranslate(text, src, tgt) {
+    const res = await fetch(DEEPSEEK_API, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${currentApiKey}`
+        },
+        body: JSON.stringify({
+            model: 'deepseek-v4-flash',
+            messages: [
+                { role: 'system', content: buildTranslatePrompt(text, src, tgt, currentStyle) },
+                { role: 'user', content: text }
+            ],
+            temperature: 0.3,
+            max_tokens: 4096
+        })
+    });
+
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error?.message || `HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+    const translated = data.choices?.[0]?.message?.content?.trim() || '';
+    targetText.textContent = translated;
+    showToast(`翻译完成 · 消耗 ${data.usage?.total_tokens || '?'} tokens`, 'success');
+}
+
+async function streamTranslate(text, src, tgt) {
+    targetText.classList.add('streaming-cursor');
+    let fullText = '';
+
+    const res = await fetch(DEEPSEEK_API, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${currentApiKey}`
+        },
+        body: JSON.stringify({
+            model: 'deepseek-v4-flash',
+            messages: [
+                { role: 'system', content: buildTranslatePrompt(text, src, tgt, currentStyle) },
+                { role: 'user', content: text }
+            ],
+            temperature: 0.3,
+            max_tokens: 4096,
+            stream: true
+        })
+    });
+
+    if (!res.ok) {
+        targetText.classList.remove('streaming-cursor');
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error?.message || `HTTP ${res.status}`);
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+            if (line.startsWith('data: ')) {
+                const data = line.slice(6).trim();
+                if (data === '[DONE]') continue;
+                try {
+                    const parsed = JSON.parse(data);
+                    const content = parsed.choices?.[0]?.delta?.content || '';
+                    if (content) {
+                        fullText += content;
+                        targetText.textContent = fullText;
+                        updateCounts();
+                        targetText.scrollTop = targetText.scrollHeight;
+                    }
+                } catch (e) {
+                    // skip unparseable
+                }
+            }
+        }
+    }
+
+    targetText.classList.remove('streaming-cursor');
+    showToast('流式翻译完成 ✓', 'success');
+}
+
+// ====== Toast ======
+let toastTimer;
+function showToast(msg, type = '') {
+    clearTimeout(toastTimer);
+    toast.textContent = msg;
+    toast.className = `toast ${type}`;
+    requestAnimationFrame(() => toast.classList.add('show'));
+    toastTimer = setTimeout(() => toast.classList.remove('show'), 2500);
+}
+
+// ====== Mode Tabs ======
+const modeTabs = document.querySelectorAll('.mode-tab');
+const translatorCard = document.querySelector('.translator-card');
+const namingCard = document.getElementById('namingCard');
+const namingInput = document.getElementById('namingInput');
+const namingPlaceholder = document.getElementById('namingPlaceholder');
+const namingResults = document.getElementById('namingResults');
+const pageFooter = document.getElementById('pageFooter');
+let currentMode = 'translate';
+let namingFormat = localStorage.getItem('ai-translator-naming-format') || 'all';
+
+modeTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+        modeTabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        currentMode = tab.dataset.mode;
+
+        if (currentMode === 'translate') {
+            translatorCard.style.display = '';
+            namingCard.classList.remove('active');
+            pageFooter.textContent = '快捷键：Ctrl+Enter 翻译 · 支持 15 种语言 · 基于 DeepSeek 大模型';
+            sourceText.focus();
+        } else {
+            translatorCard.style.display = 'none';
+            namingCard.classList.add('active');
+            pageFooter.textContent = '输入中文短语，按 Enter 获取代码命名 · 支持驼峰/帕斯卡/蛇形/短横线命名';
+            namingInput.focus();
+        }
+    });
+});
+
+// ====== Code Naming ======
+let namingTimer;
+namingInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        generateName();
+    }
+});
+
+async function generateName() {
+    const text = namingInput.value.trim();
+    if (!text) {
+        showToast('请输入中文短语', 'error');
+        return;
+    }
+
+    if (!ensureApiKey()) return;
+
+    namingPlaceholder.style.display = 'none';
+    namingResults.style.display = 'block';
+    namingResults.innerHTML = '<div class="naming-placeholder" style="padding:1.5rem">⏳ 正在生成命名方案...</div>';
+
+    try {
+        const res = await fetch(DEEPSEEK_API, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${currentApiKey}`
+            },
+            body: JSON.stringify({
+                model: 'deepseek-v4-flash',
+                messages: [
+                    { role: 'system', content: `你是一个专业的代码命名助手。用户输入一个中文词语或短语，你需要给出 3~5 个不同的英文代码命名方案。
+
+命名规则：
+1. 使用简洁、语义准确的英文
+2. 遵循常见编程命名约定（如 get/set/is/has 等前缀用于方法，名词用于属性）
+3. 对于较长的中文短语，提取核心含义，不要逐字直译
+4. 如果是方法/动作类，使用动词开头；如果是属性/名词类，使用名词
+5. 每个方案从不同角度命名（如不同的英文词汇、不同的抽象层级、不同的命名风格）
+6. 第一个方案作为"推荐"方案，应该是业界最常用的命名方式
+
+请严格按以下 JSON 格式返回，不要添加任何其他内容：
+{
+  "candidates": [
+    {
+      "camelCase": "驼峰命名",
+      "PascalCase": "帕斯卡命名",
+      "snake_case": "蛇形命名",
+      "kebab-case": "短横线命名",
+      "explanation": "这个方案的含义和适用场景",
+      "label": "推荐"
+    }
+  ]
+}` },
+                    { role: 'user', content: text }
+                ],
+                temperature: 0.3,
+                max_tokens: 512,
+                response_format: { type: 'json_object' }
+            })
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error?.message || `HTTP ${res.status}`);
+        }
+
+        const data = await res.json();
+        const content = data.choices?.[0]?.message?.content?.trim() || '';
+        const result = JSON.parse(content);
+        window._lastCandidates = result.candidates || [];
+        renderCandidates(window._lastCandidates);
+    } catch (err) {
+        namingResults.innerHTML = `<div class="naming-placeholder" style="padding:1.5rem;color:var(--danger)">❌ ${err.message}</div>`;
+    }
+}
+
+function renderCandidates(candidates) {
+    if (!candidates.length) {
+        namingResults.innerHTML = '<div class="naming-placeholder" style="padding:1.5rem">未能生成命名建议，请尝试其他短语</div>';
+        document.getElementById('formatSelector').style.display = 'none';
+        return;
+    }
+
+    // Show format selector, sync active state
+    const formatSelector = document.getElementById('formatSelector');
+    formatSelector.style.display = 'flex';
+    document.querySelectorAll('.format-chip').forEach(chip => {
+        chip.classList.toggle('active', chip.dataset.format === namingFormat);
+    });
+
+    const allCasings = [
+        { key: 'camelCase', emoji: '🐫', label: 'camel' },
+        { key: 'PascalCase', emoji: '🏛️', label: 'Pascal' },
+        { key: 'snake_case', emoji: '🐍', label: 'snake' },
+        { key: 'kebab-case', emoji: '🍢', label: 'kebab' }
+    ];
+
+    // Filter casings if a specific format is selected
+    const casings = namingFormat === 'all'
+        ? allCasings
+        : allCasings.filter(cs => cs.key === namingFormat);
+
+    const html = candidates.map((c, i) => {
+        const isRecommend = c.label === '推荐' || i === 0;
+        const labelClass = isRecommend ? 'recommend' : 'alt';
+        const labelText = c.label || (isRecommend ? '推荐' : '备选');
+
+        const chips = casings.map(cs => {
+            const val = c[cs.key] || '-';
+            return `<span class="casing-chip" data-value="${escapeHtml(val)}" title="点击复制">
+                <span class="case-type">${cs.emoji} ${cs.label}</span> ${escapeHtml(val)}
+            </span>`;
+        }).join('');
+
+        return `<div class="candidate-card">
+            <div class="candidate-header">
+                <span class="candidate-label ${labelClass}">${labelText}</span>
+            </div>
+            <div class="candidate-casings">${chips}</div>
+            <div class="candidate-explanation">💡 ${escapeHtml(c.explanation || '')}</div>
+        </div>`;
+    }).join('');
+
+    namingResults.innerHTML = html;
+    showToast(`已生成 ${candidates.length} 个命名方案`, 'success');
+}
+
+// ====== Format Selector ======
+document.getElementById('formatSelector').addEventListener('click', (e) => {
+    const chip = e.target.closest('.format-chip');
+    if (!chip) return;
+    namingFormat = chip.dataset.format;
+    localStorage.setItem('ai-translator-naming-format', namingFormat);
+    document.querySelectorAll('.format-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    // Re-render with cached data
+    if (window._lastCandidates) {
+        renderCandidates(window._lastCandidates);
+    }
+});
+
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+// Ensure API Key is set before any operation
+function ensureApiKey() {
+    if (!currentApiKey) {
+        showToast('⚠️ 请先设置 DeepSeek API Key', 'error');
+        // Open settings modal
+        document.querySelectorAll('.settings-option').forEach(opt => {
+            opt.classList.toggle('active', opt.dataset.theme === currentTheme);
+        });
+        apiKeyInput.value = '';
+        updateApiKeyHint();
+        settingsOverlay.style.display = 'flex';
+        setTimeout(() => apiKeyInput.focus(), 300);
+        return false;
+    }
+    return true;
+}
+
+// Naming chip copy
+namingResults.addEventListener('click', (e) => {
+    const chip = e.target.closest('.casing-chip');
+    if (!chip) return;
+    const value = chip.dataset.value;
+    if (!value || value === '-') return;
+    navigator.clipboard.writeText(value).then(() => {
+        chip.classList.add('copied');
+        const original = chip.innerHTML;
+        chip.innerHTML = '✓ 已复制';
+        showToast(`已复制: ${value}`, 'success');
+        setTimeout(() => {
+            chip.classList.remove('copied');
+            chip.innerHTML = original;
+        }, 1500);
+    });
+});
+
+// ====== Init ======
+updateCounts();
+sourceText.focus();
+</script>
+</body>
+</html>
