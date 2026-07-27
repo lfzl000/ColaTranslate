@@ -1,70 +1,84 @@
 # 🐕 可乐翻译助手 (ColaTranslate)
 
-基于 DeepSeek 大模型的智能翻译与代码命名工具。
+基于大模型的智能翻译与代码命名工具，支持 DeepSeek、OpenAI 及任何兼容接口。
 
 ## ✨ 功能
 
 ### 🌐 AI 翻译
 - 支持 **15 种语言** 互译（中/英/日/韩/法/德/西/葡/俄/阿/泰/越/意/荷/波兰）
-- **智能语言检测**：输入中文自动翻译为英文，输入英文自动翻译为中文
-- **流式输出**：SSE 逐字展示翻译结果，即时可见
-- **4 种翻译风格**：自动 / 正式 / 口语 / 学术 / 开发者
-- **快捷键**：`Ctrl + Enter` 一键翻译
+- **智能语言检测**：输入中文自动翻英文，输入英文自动翻中文
+- **流式输出**：逐字展示翻译结果，即时可见
+- **5 种翻译风格**：自动 / 正式 / 口语 / 学术 / 开发者
+- **快捷键**：`Ctrl + Enter` 翻译，`Enter` 换行
 
 ### 💻 代码命名
-- 输入中文短语，自动生成代码命名方案
-- 每次给出 **3~5 个候选方案**，可自由挑选
+- 输入中文短语，AI 生成 3~5 个候选方案
+- **单行** → 详细推荐（含说明），**多行** → 批量生成
 - 支持 **4 种命名格式**：camelCase / PascalCase / snake_case / kebab-case
-- **格式筛选**：可设置只显示指定格式
-- 点击即可**一键复制**
+- 格式筛选器，一键切换只显示需要的格式
+
+### 📄 Markdown 翻译
+- 翻译 Markdown 文档，保留代码块、表格、链接等格式
+- 代码块内内容**完全不翻译**
+
+### 📜 历史记录
+- 自动保存翻译结果，保留 **7 天**
+- 点击历史条目一键恢复原文和译文
+
+### ⚙️ 多模型支持
+- **DeepSeek**：官方接口，填入 Key 即用
+- **OpenAI 兼容**：支持任意兼容接口（OpenAI / 自定义代理 / 本地服务）
+- 一键 **获取可用模型列表**
+- 各提供商的配置**独立存储**，切换不丢失
 
 ### 🎨 界面
-- 玻璃拟态（Glass Morphism）设计风格
+- 玻璃拟态设计风格
 - 亮色 / 深色 / 跟随系统 三种主题
-- 面向前端 API Key 设置，密钥仅保存在浏览器本地
+- 翻译区域自动适应内容高度
+- **Chrome 侧边栏插件** — 不离开网页即可使用
 
 ## 🚀 快速开始
 
-### 方式一：纯前端（推荐）
-
-1. 打开 `public/index.html`，或部署为静态站点
-2. 点击右上角 ⚙️ 设置图标，填入 [DeepSeek API Key](https://platform.deepseek.com/api_keys)
-3. 开始使用
-
-### 方式二：本地后端开发
+### Web 版（后端代理，推荐）
 
 ```bash
-# 安装依赖
 npm install
-
-# 配置 API Key
-cp .env.example .env
-# 编辑 .env 填入 DEEPSEEK_API_KEY
-
-# 启动服务
 npm start
-
 # 访问 http://localhost:3456
+# 点击右上角 ⚙️ 填入 API Key 即可使用
 ```
+
+### 浏览器插件
+
+1. 打开 Chrome → `chrome://extensions/`
+2. 开启「开发者模式」
+3. 点击「加载已解压的扩展程序」→ 选择 `extension/` 目录
+4. 点击工具栏图标，侧边栏出现翻译助手
 
 ## 📁 项目结构
 
 ```
 ColaTranslate/
 ├── public/
-│   └── index.html      # 前端界面（翻译 + 代码命名）
-├── server.js            # 本地开发后端（API 代理）
+│   └── index.html       # Web 版前端
+├── extension/            # Chrome 插件
+│   ├── manifest.json
+│   ├── background.js
+│   ├── sidepanel.html
+│   ├── sidepanel.js
+│   └── icons/
+├── server.js             # Node.js 后端（API 代理）
 ├── package.json
-├── .env.example         # API Key 配置模板
+├── .env.example
 └── README.md
 ```
 
 ## 🛠️ 技术栈
 
 - **前端**：原生 HTML/CSS/JS，玻璃拟态 UI
-- **AI 模型**：DeepSeek V4-Flash
-- **后端**（可选）：Node.js + Express
-- **部署**：支持静态站点直接部署
+- **后端**（可选）：Node.js + Express（解决 CORS，转发 API 请求）
+- **支持模型**：DeepSeek V3/R1、GPT-4o、GPT-3.5 等任何 OpenAI 兼容模型
+- **部署**：支持静态站点部署（CloudStudio），也支持 Node.js 服务部署（Render 等）
 
 ## 📄 License
 
