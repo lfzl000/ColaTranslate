@@ -27,7 +27,6 @@ const apiKeyInput = document.getElementById('apiKeyInput');
 const apiKeyHint = document.getElementById('apiKeyHint');
 
 let currentTheme = localStorage.getItem('ai-translator-theme') || 'system';
-let currentApiKey = localStorage.getItem('ai-translator-api-key') || '';
 
 // Apply theme (system-aware)
 function applyTheme(mode) {
@@ -56,6 +55,10 @@ settingsBtn.addEventListener('click', () => {
         opt.classList.toggle('active', opt.dataset.theme === currentTheme);
     });
     apiKeyInput.value = currentApiKey;
+    const apiBaseInput = document.getElementById('apiBaseInput');
+    const modelInput = document.getElementById('modelInput');
+    if (apiBaseInput) apiBaseInput.value = currentApiBase;
+    if (modelInput) modelInput.value = currentModel;
     updateApiKeyHint();
     settingsOverlay.style.display = 'flex';
     apiKeyInput.focus();
@@ -89,14 +92,20 @@ function updateApiKeyHint() {
 settingsSave.addEventListener('click', () => {
     const newTheme = currentTheme;
     const newKey = apiKeyInput.value.trim();
+    const newBase = (document.getElementById('apiBaseInput')?.value || '').trim() || 'https://api.deepseek.com/v1';
+    const newModel = (document.getElementById('modelInput')?.value || '').trim() || 'deepseek-v4-flash';
 
     // Update API Key
-    if (newKey && !newKey.startsWith('sk-')) {
+    if (newKey && !newKey.startsWith('sk-') && newBase.includes('deepseek')) {
         showToast('API Key 格式不正确，应以 sk- 开头', 'error');
         return;
     }
     currentApiKey = newKey;
+    currentApiBase = newBase;
+    currentModel = newModel;
     localStorage.setItem('ai-translator-api-key', currentApiKey);
+    localStorage.setItem('ai-translator-api-base', currentApiBase);
+    localStorage.setItem('ai-translator-model', currentModel);
     localStorage.setItem('ai-translator-theme', newTheme);
 
     applyTheme(newTheme);
@@ -299,8 +308,17 @@ async function translate() {
     }
 }
 
-// ====== DeepSeek API Helpers ======
-const DEEPSEEK_API = 'https://api.deepseek.com/v1/chat/completions';
+// ====== API Config ======
+let currentApiBase = localStorage.getItem('ai-translator-api-base') || 'https://api.deepseek.com/v1';
+let currentApiKey = localStorage.getItem('ai-translator-api-key') || '';
+let currentModel = localStorage.getItem('ai-translator-model') || 'deepseek-v4-flash';
+
+function getApiUrl() {
+    const base = currentApiBase.replace(/\/+$/, '');
+    return `${base}/chat/completions`;
+}
+
+// ====== API Helpers ======
 
 const LANG_NAMES = {
     'zh': 'Chinese', 'en': 'English', 'ja': 'Japanese',
@@ -327,14 +345,14 @@ ${styleGuide}
 }
 
 async function normalTranslate(text, src, tgt) {
-    const res = await fetch(DEEPSEEK_API, {
+    const res = await fetch(getApiUrl(), {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${currentApiKey}`
         },
         body: JSON.stringify({
-            model: 'deepseek-v4-flash',
+            model: currentModel,
             messages: [
                 { role: 'system', content: buildTranslatePrompt(text, src, tgt, currentStyle) },
                 { role: 'user', content: text }
@@ -360,14 +378,14 @@ async function streamTranslate(text, src, tgt) {
     targetText.classList.add('streaming-cursor');
     let fullText = '';
 
-    const res = await fetch(DEEPSEEK_API, {
+    const res = await fetch(getApiUrl(), {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${currentApiKey}`
         },
         body: JSON.stringify({
-            model: 'deepseek-v4-flash',
+            model: currentModel,
             messages: [
                 { role: 'system', content: buildTranslatePrompt(text, src, tgt, currentStyle) },
                 { role: 'user', content: text }
@@ -508,14 +526,14 @@ async function generateName() {
     namingResults.innerHTML = '<div class="naming-placeholder" style="padding:1.5rem">⏳ 正在生成命名方案...</div>';
 
     try {
-        const res = await fetch(DEEPSEEK_API, {
+        const res = await fetch(getApiUrl(), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${currentApiKey}`
             },
             body: JSON.stringify({
-                model: 'deepseek-v4-flash',
+                model: currentModel,
                 messages: [
                     { role: 'system', content: `你是一个专业的代码命名助手。用户输入一个中文词语或短语，你需要给出 3~5 个不同的英文代码命名方案。
 
@@ -638,11 +656,11 @@ async function doBatchNaming(lines) {
     document.getElementById('formatSelector').style.display = 'none';
 
     try {
-        const res = await fetch(DEEPSEEK_API, {
+        const res = await fetch(getApiUrl(), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentApiKey}` },
             body: JSON.stringify({
-                model: 'deepseek-v4-flash',
+                model: currentModel,
                 messages: [{ role: 'system', content: `针对用户输入的每一行中文，给出对应的英文代码命名。严格按 JSON 格式返回：
 { "items": [{"chinese": "中文", "camelCase": "...", "PascalCase": "...", "snake_case": "...", "kebab-case": "..."}] }
 每个 item 对应一行输入。` }, { role: 'user', content: lines.join('\n') }],
@@ -725,11 +743,11 @@ mdTranslateBtn.addEventListener('click', async () => {
     mdTargetText.textContent = '';
 
     try {
-        const res = await fetch(DEEPSEEK_API, {
+        const res = await fetch(getApiUrl(), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentApiKey}` },
             body: JSON.stringify({
-                model: 'deepseek-v4-flash',
+                model: currentModel,
                 messages: [{ role: 'system', content: `你是 Markdown 翻译助手。将以下 Markdown 内容从${srcName}翻译成${tgtName}。
 规则：
 1. 保留所有 Markdown 语法（# 标题、**加粗**、\`代码\`、表格、链接、列表等）原样不动
