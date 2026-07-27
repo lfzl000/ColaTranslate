@@ -332,6 +332,20 @@ body::before {
     transform: none;
 }
 
+.model-badge {
+    font-size: 0.7rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: 12px;
+    background: var(--primary-glow);
+    color: var(--primary);
+    font-weight: 600;
+    white-space: nowrap;
+    letter-spacing: 0.3px;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 /* ====== Spinner ====== */
 .spinner {
     width: 18px; height: 18px;
@@ -963,6 +977,7 @@ body::before {
             <button class="action-btn" id="streamToggle" title="切换流式/普通模式">
                 <span>⚡</span> 流式
             </button>
+            <span class="model-badge" id="modelBadge" title="当前模型"></span>
             <button class="translate-btn" id="translateBtn">
                 <span class="btn-text">🔄 翻译</span>
                 <span class="spinner"></span>

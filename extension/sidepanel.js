@@ -179,6 +179,7 @@ settingsSave.addEventListener('click', () => {
     localStorage.setItem('ai-translator-theme', newTheme);
 
     applyTheme(newTheme);
+    updateModelBadge();
     settingsOverlay.style.display = 'none';
     showToast('设置已保存 ✓', 'success');
 });
@@ -1030,5 +1031,12 @@ historyList.addEventListener('click', (e) => {
 });
 
 // ====== Init ======
+function updateModelBadge() {
+    const badge = document.getElementById('modelBadge');
+    const short = currentModel.length > 15 ? currentModel.slice(0, 14) + '…' : currentModel;
+    badge.textContent = short;
+    badge.title = `${currentProvider === 'deepseek' ? 'DeepSeek' : 'OpenAI'} · ${currentModel}`;
+}
+updateModelBadge();
 updateCounts();
 sourceText.focus();
