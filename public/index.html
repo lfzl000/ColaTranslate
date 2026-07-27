@@ -735,6 +735,112 @@ body::before {
     box-shadow: 0 4px 12px var(--primary-glow);
 }
 .settings-save:hover { transform: translateY(-1px); box-shadow: 0 6px 20px var(--primary-glow); }
+
+/* ====== History Panel ====== */
+.history-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.3);
+    backdrop-filter: blur(4px);
+    z-index: 200;
+    display: none;
+    justify-content: flex-end;
+}
+.history-panel {
+    width: 380px;
+    max-width: 90vw;
+    height: 100%;
+    background: var(--surface);
+    box-shadow: -10px 0 40px rgba(0,0,0,0.15);
+    display: flex;
+    flex-direction: column;
+    animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+.history-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+.history-header h3 { font-size: 1rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem; }
+.history-close {
+    width: 32px; height: 32px; border-radius: 50%; border: none; background: transparent;
+    color: var(--text-secondary); font-size: 1rem; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+}
+.history-close:hover { background: var(--border); color: var(--text); }
+.history-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.75rem;
+}
+.history-item {
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    margin-bottom: 0.5rem;
+    cursor: pointer;
+    transition: all var(--transition);
+}
+.history-item:hover { border-color: var(--primary-light); background: var(--surface-hover); }
+.history-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.35rem;
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+}
+.history-lang { font-weight: 600; color: var(--primary); }
+.history-time { margin-left: auto; }
+.history-source {
+    font-size: 0.85rem;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-bottom: 0.2rem;
+}
+.history-target {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.history-delete {
+    float: right;
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.7rem;
+    cursor: pointer;
+    margin-top: -0.2rem;
+}
+.history-delete:hover { color: var(--danger); background: rgba(239,68,68,0.1); }
+.history-empty { text-align: center; padding: 3rem 1rem; color: var(--text-secondary); font-size: 0.85rem; opacity: 0.6; }
+.history-footer {
+    padding: 0.75rem 1.5rem;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+}
+.history-clear-all {
+    width: 100%;
+    padding: 0.5rem;
+    border-radius: 8px;
+    border: 1px solid var(--danger);
+    background: transparent;
+    color: var(--danger);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all var(--transition);
+}
+.history-clear-all:hover { background: rgba(239,68,68,0.08); }
 </style>
 </head>
 <body data-theme="light">
@@ -764,6 +870,7 @@ body::before {
             </div>
         </div>
         <div style="display:flex;align-items:center;gap:0.5rem">
+            <button class="theme-toggle" id="historyBtn" title="历史记录">📜</button>
             <button class="theme-toggle" id="settingsBtn" title="设置">⚙️</button>
         </div>
     </div>
@@ -927,6 +1034,22 @@ body::before {
     </div>
 
     <div class="footer" id="pageFooter">快捷键：Ctrl+Enter 翻译 · 支持 15 种语言 · 基于 DeepSeek 大模型</div>
+</div>
+
+<!-- History Panel -->
+<div class="history-overlay" id="historyOverlay">
+    <div class="history-panel">
+        <div class="history-header">
+            <h3>📜 翻译历史</h3>
+            <button class="history-close" id="historyClose">✕</button>
+        </div>
+        <div class="history-list" id="historyList">
+            <div class="history-empty">暂无翻译记录</div>
+        </div>
+        <div class="history-footer">
+            <button class="history-clear-all" id="historyClearAll">🗑️ 清空全部历史</button>
+        </div>
+    </div>
 </div>
 
 <!-- Settings Modal -->
@@ -1322,6 +1445,7 @@ async function normalTranslate(text, src, tgt) {
     const data = await res.json();
     const translated = data.choices?.[0]?.message?.content?.trim() || '';
     targetText.textContent = translated;
+    addHistory('translate', text, translated, src, tgt);
     showToast(`翻译完成 · 消耗 ${data.usage?.total_tokens || '?'} tokens`, 'success');
 }
 
@@ -1387,6 +1511,7 @@ async function streamTranslate(text, src, tgt) {
     }
 
     targetText.classList.remove('streaming-cursor');
+    addHistory('translate', text, fullText, src, tgt);
     showToast('流式翻译完成 ✓', 'success');
 }
 
@@ -1526,6 +1651,9 @@ async function generateName() {
         const result = safeJSONParse(content, { candidates: [] });
         window._lastCandidates = result.candidates || [];
         renderCandidates(window._lastCandidates);
+        // Save to history
+        const namingText = window._lastCandidates.map(c => `${c.label || '方案'}：${c.camelCase} / ${c.PascalCase} / ${c.snake_case} / ${c['kebab-case']} - ${c.explanation}`).join('\n');
+        addHistory('naming', text, namingText, 'zh', 'en');
     } catch (err) {
         namingResults.innerHTML = `<div class="naming-placeholder" style="padding:1.5rem;color:var(--danger)">❌ ${err.message}</div>`;
     }
@@ -1620,6 +1748,8 @@ async function doBatchNaming(lines) {
         window._lastBatchResults = result.items || [];
         window._lastCandidates = null;
         renderBatchResults(window._lastBatchResults);
+        const batchText = window._lastBatchResults.map(item => `${item.chinese} → ${item.camelCase} / ${item.PascalCase} / ${item.snake_case} / ${item['kebab-case']}`).join('\n');
+        addHistory('naming', lines.join('\n'), batchText, 'zh', 'en');
         showToast(`已生成 ${window._lastBatchResults.length} 个命名方案`, 'success');
     } catch (err) {
         namingResults.innerHTML = `<div class="naming-placeholder" style="padding:1.5rem;color:var(--danger)">❌ ${err.message}</div>`;
@@ -1707,6 +1837,7 @@ mdTranslateBtn.addEventListener('click', async () => {
         const data = await res.json();
         mdTargetText.textContent = data.choices?.[0]?.message?.content?.trim() || '';
         mdTargetCount.textContent = `${mdTargetText.textContent.length} 字符`;
+        addHistory('mdTranslate', text, mdTargetText.textContent, mdSourceLang.value, mdTargetLang.value);
         showToast('Markdown 翻译完成', 'success');
     } catch (err) {
         mdTargetText.textContent = `❌ 翻译失败: ${err.message}`;
@@ -1770,6 +1901,137 @@ namingResults.addEventListener('click', (e) => {
             chip.innerHTML = original;
         }, 1500);
     });
+});
+
+// ====== History ======
+const HISTORY_KEY = 'ai-translator-history';
+const HISTORY_DAYS = 7;
+const historyOverlay = document.getElementById('historyOverlay');
+const historyList = document.getElementById('historyList');
+const historyBtn = document.getElementById('historyBtn');
+
+function loadHistory() {
+    try {
+        return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+    } catch { return []; }
+}
+
+function saveHistory(items) {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(items));
+}
+
+function cleanHistory() {
+    const now = Date.now();
+    const expire = HISTORY_DAYS * 24 * 60 * 60 * 1000;
+    const items = loadHistory().filter(item => (now - item.timestamp) < expire);
+    if (items.length !== loadHistory().length) saveHistory(items);
+    return items;
+}
+
+function addHistory(mode, sourceText, targetText, sourceLang, targetLang) {
+    const items = cleanHistory();
+    items.unshift({
+        id: Date.now(),
+        mode,
+        sourceText: sourceText.slice(0, 200),
+        targetText: targetText.slice(0, 500),
+        sourceLang,
+        targetLang,
+        timestamp: Date.now()
+    });
+    // Keep max 50
+    if (items.length > 50) items.length = 50;
+    saveHistory(items);
+}
+
+function renderHistory() {
+    const items = cleanHistory();
+    if (!items.length) {
+        historyList.innerHTML = '<div class="history-empty">暂无翻译记录</div>';
+        return;
+    }
+    const langNames = { zh: '中文', en: 'English', ja: '日本語', ko: '한국어', fr: 'Français', de: 'Deutsch', es: 'Español', auto: '自动' };
+    const modeNames = { translate: '🌐', naming: '💻', mdTranslate: '📄' };
+    historyList.innerHTML = items.map(item => {
+        const d = new Date(item.timestamp);
+        const time = `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+        const srcLabel = langNames[item.sourceLang] || item.sourceLang || '自动';
+        const tgtLabel = langNames[item.targetLang] || item.targetLang;
+        return `<div class="history-item" data-id="${item.id}">
+            <button class="history-delete" data-action="delete">✕</button>
+            <div class="history-meta">
+                <span>${modeNames[item.mode] || ''}</span>
+                <span class="history-lang">${srcLabel} → ${tgtLabel}</span>
+                <span class="history-time">${time}</span>
+            </div>
+            <div class="history-source">${escapeHtml(item.sourceText)}</div>
+            <div class="history-target">${escapeHtml(item.targetText)}</div>
+        </div>`;
+    }).join('');
+}
+
+// History panel
+historyBtn.addEventListener('click', () => {
+    renderHistory();
+    historyOverlay.style.display = 'flex';
+});
+document.getElementById('historyClose').addEventListener('click', () => {
+    historyOverlay.style.display = 'none';
+});
+historyOverlay.addEventListener('click', (e) => {
+    if (e.target === historyOverlay) historyOverlay.style.display = 'none';
+});
+document.getElementById('historyClearAll').addEventListener('click', () => {
+    if (confirm('确定清空全部历史记录？')) {
+        localStorage.removeItem(HISTORY_KEY);
+        renderHistory();
+        showToast('历史已清空');
+    }
+});
+
+// Click history item to restore
+historyList.addEventListener('click', (e) => {
+    if (e.target.dataset.action === 'delete') {
+        e.stopPropagation();
+        const id = parseInt(e.target.closest('.history-item').dataset.id);
+        const items = loadHistory().filter(i => i.id !== id);
+        saveHistory(items);
+        renderHistory();
+        return;
+    }
+    const itemEl = e.target.closest('.history-item');
+    if (!itemEl) return;
+    const id = parseInt(itemEl.dataset.id);
+    const items = loadHistory();
+    const item = items.find(i => i.id === id);
+    if (!item) return;
+
+    // Switch to correct mode tab
+    const tab = document.querySelector(`.mode-tab[data-mode="${item.mode}"]`);
+    if (tab) tab.click();
+
+    // Restore content
+    setTimeout(() => {
+        if (item.mode === 'translate') {
+            sourceText.value = item.sourceText;
+            targetText.textContent = item.targetText;
+            sourceLang.value = item.sourceLang || 'auto';
+            targetLang.value = item.targetLang || 'en';
+            updateCounts();
+        } else if (item.mode === 'naming') {
+            namingInput.value = item.sourceText;
+            namingPlaceholder.style.display = 'none';
+            namingResults.style.display = 'block';
+            namingResults.innerHTML = `<div class="naming-placeholder" style="padding:1rem;color:var(--text-secondary);font-size:0.85rem">📋 历史记录（无法重新渲染结构化结果）</div><div class="naming-row" style="flex-wrap:wrap;gap:0.5rem;margin-top:0.5rem"><span style="font-size:0.85rem;color:var(--text);white-space:pre-wrap">${escapeHtml(item.targetText)}</span></div>`;
+        } else if (item.mode === 'mdTranslate') {
+            mdSourceText.value = item.sourceText;
+            mdTargetText.textContent = item.targetText;
+            mdSourceCount.textContent = `${item.sourceText.length} 字符`;
+            mdTargetCount.textContent = `${item.targetText.length} 字符`;
+        }
+        historyOverlay.style.display = 'none';
+        showToast('已恢复历史记录');
+    }, 100);
 });
 
 // ====== Init ======
