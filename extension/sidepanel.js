@@ -73,17 +73,18 @@ function updateProviderUI() {
         opt.classList.toggle('active', opt.dataset.provider === currentProvider);
     });
     document.getElementById('apiBaseGroup').style.display = isOpenAI ? '' : 'none';
-    document.getElementById('modelGroup').style.display = isOpenAI ? '' : 'none';
-    document.getElementById('fetchModelsBtn').style.display = isOpenAI ? '' : 'none';
+    document.getElementById('modelGroup').style.display = '';
+    document.getElementById('fetchModelsBtn').style.display = '';
     document.getElementById('modelSelect').style.display = 'none';
     document.getElementById('modelInput').style.display = '';
 }
 
 // Fetch available models from API
 document.getElementById('fetchModelsBtn').addEventListener('click', async () => {
-    const base = document.getElementById('apiBaseInput').value.trim().replace(/\/+$/, '');
     const key = apiKeyInput.value.trim();
-    if (!base) { showToast('请先填写 API 请求地址', 'error'); return; }
+    const base = currentProvider === 'deepseek'
+        ? 'https://api.deepseek.com/v1'
+        : document.getElementById('apiBaseInput').value.trim().replace(/\/+$/, '');
     if (!key) { showToast('请先填写 API Key', 'error'); return; }
 
     const btn = document.getElementById('fetchModelsBtn');
@@ -408,7 +409,7 @@ function loadProviderConfig(provider) {
     return {
         apiBase: 'https://api.deepseek.com/v1',
         apiKey: localStorage.getItem('ai-deepseek-api-key') || '',
-        model: 'deepseek-v4-flash'
+        model: localStorage.getItem('ai-deepseek-model') || 'deepseek-v4-flash'
     };
 }
 
@@ -419,6 +420,7 @@ function saveProviderConfig(provider, apiKey, apiBase, model) {
         localStorage.setItem('ai-openai-model', model);
     } else {
         localStorage.setItem('ai-deepseek-api-key', apiKey);
+        localStorage.setItem('ai-deepseek-model', model);
     }
 }
 
