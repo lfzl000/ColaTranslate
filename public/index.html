@@ -772,6 +772,8 @@ body::before {
     <div class="mode-tabs">
         <button class="mode-tab active" data-mode="translate">🌐 翻译</button>
         <button class="mode-tab" data-mode="naming">💻 代码命名</button>
+        <button class="mode-tab" data-mode="batchName">📝 批量命名</button>
+        <button class="mode-tab" data-mode="mdTranslate">📄 MD翻译</button>
     </div>
 
     <!-- Translator Card -->
@@ -882,6 +884,75 @@ body::before {
         </div>
         <div class="naming-results" id="namingResults" style="display:none">
             <!-- 动态填充候选方案 -->
+        </div>
+    </div>
+
+    <!-- Batch Naming Card -->
+    <div class="naming-card" id="batchNameCard">
+        <div class="naming-input-area">
+            <textarea class="naming-input" id="batchNameInput"
+                placeholder="每行输入一个中文词语或短语&#10;例如：&#10;用户列表&#10;获取数据&#10;最大连接数"
+                style="min-height:120px;resize:vertical;padding:0.9rem 1.2rem;border-radius:10px;border:2px solid var(--border);background:var(--surface);color:var(--text);font-size:1rem;font-family:inherit;outline:none;width:100%;transition:all var(--transition);line-height:1.6"
+                autocomplete="off"></textarea>
+            <div class="format-selector" id="batchFormatSelector" style="display:flex;margin-top:0.6rem">
+                <span class="format-label">显示格式：</span>
+                <button class="format-chip active" data-format="all">📋 全部</button>
+                <button class="format-chip" data-format="camelCase">🐫 camel</button>
+                <button class="format-chip" data-format="PascalCase">🏛️ Pascal</button>
+                <button class="format-chip" data-format="snake_case">🐍 snake</button>
+                <button class="format-chip" data-format="kebab-case">🍢 kebab</button>
+            </div>
+            <div style="margin-top:0.5rem">
+                <button class="translate-btn" id="batchGenerateBtn" style="margin-left:0">
+                    <span class="btn-text">🔄 批量生成</span>
+                    <span class="spinner"></span>
+                </button>
+            </div>
+        </div>
+        <div class="naming-results" id="batchNameResults" style="display:none">
+            <!-- 动态填充 -->
+        </div>
+        <div class="naming-placeholder" id="batchNamePlaceholder">
+            👆 每行一个中文短语，点击「批量生成」获取命名建议
+        </div>
+    </div>
+
+    <!-- Markdown Translate Card -->
+    <div class="naming-card" id="mdTranslateCard">
+        <div class="lang-bar" style="padding:1rem 1.5rem">
+            <select class="lang-select" id="mdSourceLang">
+                <option value="auto">🌍 自动检测</option>
+                <option value="zh">🇨🇳 中文</option>
+                <option value="en">🇺🇸 English</option>
+                <option value="ja">🇯🇵 日本語</option>
+            </select>
+            <button class="swap-btn" id="mdSwapBtn" title="交换语言">⇄</button>
+            <select class="lang-select" id="mdTargetLang">
+                <option value="zh">🇨🇳 中文</option>
+                <option value="en" selected>🇺🇸 English</option>
+                <option value="ja">🇯🇵 日本語</option>
+            </select>
+        </div>
+        <div class="text-areas">
+            <div class="text-panel">
+                <textarea class="text-input" id="mdSourceText"
+                    placeholder="粘贴 Markdown 内容...
+支持代码块、表格、链接等格式保留"></textarea>
+                <div class="char-count" id="mdSourceCount">0 字符</div>
+            </div>
+            <div class="text-panel">
+                <div class="text-output" id="mdTargetText"
+                    style="white-space:pre-wrap;word-break:break-word;min-height:200px;max-height:400px;overflow-y:auto;font-size:1rem;line-height:1.7;padding:0;border:none;outline:none;background:transparent;color:var(--text)"></div>
+                <div class="char-count" id="mdTargetCount">0 字符</div>
+            </div>
+        </div>
+        <div class="actions">
+            <button class="action-btn" id="mdClearBtn"><span>🗑️</span> 清空</button>
+            <button class="action-btn" id="mdCopyBtn"><span>📋</span> 复制</button>
+            <button class="translate-btn" id="mdTranslateBtn">
+                <span class="btn-text">🔄 翻译</span>
+                <span class="spinner"></span>
+            </button>
         </div>
     </div>
 
@@ -1368,6 +1439,16 @@ const namingResults = document.getElementById('namingResults');
 const pageFooter = document.getElementById('pageFooter');
 let currentMode = 'translate';
 let namingFormat = localStorage.getItem('ai-translator-naming-format') || 'all';
+const batchNameCard = document.getElementById('batchNameCard');
+const mdTranslateCard = document.getElementById('mdTranslateCard');
+
+// Hide all cards except active
+function hideAllCards() {
+    translatorCard.style.display = 'none';
+    namingCard.classList.remove('active');
+    batchNameCard.classList.remove('active');
+    mdTranslateCard.classList.remove('active');
+}
 
 modeTabs.forEach(tab => {
     tab.addEventListener('click', () => {
@@ -1375,16 +1456,28 @@ modeTabs.forEach(tab => {
         tab.classList.add('active');
         currentMode = tab.dataset.mode;
 
-        if (currentMode === 'translate') {
-            translatorCard.style.display = '';
-            namingCard.classList.remove('active');
-            pageFooter.textContent = '快捷键：Ctrl+Enter 翻译 · 支持 15 种语言 · 基于 DeepSeek 大模型';
-            sourceText.focus();
-        } else {
-            translatorCard.style.display = 'none';
-            namingCard.classList.add('active');
-            pageFooter.textContent = '输入中文短语，按 Enter 获取代码命名 · 支持驼峰/帕斯卡/蛇形/短横线命名';
-            namingInput.focus();
+        hideAllCards();
+        switch (currentMode) {
+            case 'translate':
+                translatorCard.style.display = '';
+                pageFooter.textContent = '快捷键：Ctrl+Enter 翻译 · 支持 15 种语言 · 基于 DeepSeek 大模型';
+                sourceText.focus();
+                break;
+            case 'naming':
+                namingCard.classList.add('active');
+                pageFooter.textContent = '输入中文短语，按 Enter 获取代码命名 · 支持驼峰/帕斯卡/蛇形/短横线命名';
+                namingInput.focus();
+                break;
+            case 'batchName':
+                batchNameCard.classList.add('active');
+                pageFooter.textContent = '每行一个中文短语，批量生成代码命名';
+                document.getElementById('batchNameInput').focus();
+                break;
+            case 'mdTranslate':
+                mdTranslateCard.classList.add('active');
+                pageFooter.textContent = '翻译 Markdown 内容，保留代码块/表格/链接格式';
+                document.getElementById('mdSourceText').focus();
+                break;
         }
     });
 });
@@ -1529,6 +1622,160 @@ document.getElementById('formatSelector').addEventListener('click', (e) => {
     // Re-render with cached data
     if (window._lastCandidates) {
         renderCandidates(window._lastCandidates);
+    }
+});
+
+// ====== Batch Naming ======
+let batchNamingFormat = 'all';
+const batchNameInput = document.getElementById('batchNameInput');
+const batchGenerateBtn = document.getElementById('batchGenerateBtn');
+const batchNameResults = document.getElementById('batchNameResults');
+const batchNamePlaceholder = document.getElementById('batchNamePlaceholder');
+
+document.getElementById('batchFormatSelector').addEventListener('click', (e) => {
+    const chip = e.target.closest('.format-chip');
+    if (!chip) return;
+    batchNamingFormat = chip.dataset.format;
+    document.querySelectorAll('#batchFormatSelector .format-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    if (window._lastBatchResults) renderBatchResults(window._lastBatchResults);
+});
+
+batchGenerateBtn.addEventListener('click', async () => {
+    const lines = batchNameInput.value.split('\n').map(l => l.trim()).filter(Boolean);
+    if (!lines.length) { showToast('请输入至少一个短语', 'error'); return; }
+    if (!ensureApiKey()) return;
+
+    batchGenerateBtn.classList.add('loading');
+    batchGenerateBtn.disabled = true;
+    batchNamePlaceholder.style.display = 'none';
+    batchNameResults.style.display = 'block';
+    batchNameResults.innerHTML = `<div class="naming-placeholder" style="padding:1.5rem">⏳ 正在批量生成 ${lines.length} 个命名方案...</div>`;
+
+    try {
+        const prompt = lines.join('\n');
+        const res = await fetch(DEEPSEEK_API, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentApiKey}` },
+            body: JSON.stringify({
+                model: 'deepseek-v4-flash',
+                messages: [{ role: 'system', content: `针对用户输入的每一行中文，给出对应的英文代码命名。严格按 JSON 格式返回：
+{ "items": [{"chinese": "中文", "camelCase": "...", "PascalCase": "...", "snake_case": "...", "kebab-case": "..."}] }
+每个 item 对应一行输入，camelCase 使用驼峰命名，PascalCase 帕斯卡，snake_case 蛇形，kebab-case 短横线。` }, { role: 'user', content: prompt }],
+                temperature: 0.3, max_tokens: 4096, response_format: { type: 'json_object' }
+            })
+        });
+        if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error?.message || res.statusText); }
+        const data = await res.json();
+        const content = data.choices?.[0]?.message?.content?.trim() || '';
+        const result = JSON.parse(content);
+        window._lastBatchResults = result.items || [];
+        renderBatchResults(window._lastBatchResults);
+        showToast(`已生成 ${window._lastBatchResults.length} 个命名方案`, 'success');
+    } catch (err) {
+        batchNameResults.innerHTML = `<div class="naming-placeholder" style="padding:1.5rem;color:var(--danger)">❌ ${err.message}</div>`;
+    } finally {
+        batchGenerateBtn.classList.remove('loading');
+        batchGenerateBtn.disabled = false;
+    }
+});
+
+function renderBatchResults(items) {
+    if (!items.length) { batchNameResults.innerHTML = '<div class="naming-placeholder" style="padding:1.5rem">无结果</div>'; return; }
+    const casings = batchNamingFormat === 'all' ? ['camelCase','PascalCase','snake_case','kebab-case'] : [batchNamingFormat];
+    const labels = { camelCase: '🐫 camel', PascalCase: '🏛️ Pascal', snake_case: '🐍 snake', 'kebab-case': '🍢 kebab' };
+    const html = items.map(item => `
+        <div class="naming-row" style="flex-wrap:wrap;gap:0.5rem">
+            <span style="font-weight:600;min-width:80px;color:var(--text);font-size:0.85rem">${escapeHtml(item.chinese)}</span>
+            ${casings.map(c => `<span class="casing-chip" data-value="${escapeHtml(item[c] || '-')}" title="点击复制"><span class="case-type">${labels[c]}</span> ${escapeHtml(item[c] || '-')}</span>`).join('')}
+        </div>
+    `).join('');
+    batchNameResults.innerHTML = html;
+}
+
+// Batch naming copy handler
+batchNameResults.addEventListener('click', (e) => {
+    const chip = e.target.closest('.casing-chip');
+    if (!chip) return;
+    const v = chip.dataset.value;
+    if (!v || v === '-') return;
+    navigator.clipboard.writeText(v).then(() => {
+        const orig = chip.innerHTML;
+        chip.classList.add('copied');
+        chip.innerHTML = '✓ 已复制';
+        setTimeout(() => { chip.classList.remove('copied'); chip.innerHTML = orig; }, 1500);
+    });
+});
+
+// ====== Markdown Translate ======
+const mdSourceText = document.getElementById('mdSourceText');
+const mdTargetText = document.getElementById('mdTargetText');
+const mdTranslateBtn = document.getElementById('mdTranslateBtn');
+const mdSourceLang = document.getElementById('mdSourceLang');
+const mdTargetLang = document.getElementById('mdTargetLang');
+const mdSourceCount = document.getElementById('mdSourceCount');
+const mdTargetCount = document.getElementById('mdTargetCount');
+
+mdSourceText.addEventListener('input', () => mdSourceCount.textContent = `${mdSourceText.value.length} 字符`);
+
+document.getElementById('mdSwapBtn').addEventListener('click', () => {
+    if (mdSourceLang.value === 'auto') return;
+    [mdSourceLang.value, mdTargetLang.value] = [mdTargetLang.value, mdSourceLang.value];
+    if (mdSourceText.value && mdTargetText.textContent) {
+        [mdSourceText.value, mdTargetText.textContent] = [mdTargetText.textContent, mdSourceText.value];
+        mdSourceCount.textContent = `${mdSourceText.value.length} 字符`;
+        mdTargetCount.textContent = `${mdTargetText.textContent.length} 字符`;
+    }
+});
+
+document.getElementById('mdClearBtn').addEventListener('click', () => {
+    mdSourceText.value = ''; mdTargetText.textContent = '';
+    mdSourceCount.textContent = '0 字符'; mdTargetCount.textContent = '0 字符';
+    mdSourceText.focus();
+});
+
+document.getElementById('mdCopyBtn').addEventListener('click', async () => {
+    const t = mdTargetText.textContent.trim();
+    if (!t) { showToast('没有可复制的内容', 'error'); return; }
+    await navigator.clipboard.writeText(t);
+    showToast('已复制', 'success');
+});
+
+mdTranslateBtn.addEventListener('click', async () => {
+    const text = mdSourceText.value.trim();
+    if (!text) { showToast('请粘贴 Markdown 内容', 'error'); return; }
+    if (!ensureApiKey()) return;
+
+    const srcName = LANG_NAMES[mdSourceLang.value] || mdSourceLang.value || 'Auto';
+    const tgtName = LANG_NAMES[mdTargetLang.value] || mdTargetLang.value;
+    mdTranslateBtn.classList.add('loading'); mdTranslateBtn.disabled = true;
+    mdTargetText.textContent = '';
+
+    try {
+        const res = await fetch(DEEPSEEK_API, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentApiKey}` },
+            body: JSON.stringify({
+                model: 'deepseek-v4-flash',
+                messages: [{ role: 'system', content: `你是 Markdown 翻译助手。将以下 Markdown 内容从${srcName}翻译成${tgtName}。
+规则：
+1. 保留所有 Markdown 语法（# 标题、**加粗**、\`代码\`、表格、链接、列表等）原样不动
+2. 只翻译正文文本内容，不翻译代码块内的代码
+3. 代码块使用 \`\`\` 标记的部分，内部完全不翻译
+4. 保持表格对齐、缩进、空行等排版
+5. 只返回翻译后的 Markdown，不要任何解释` }, { role: 'user', content: text }],
+                temperature: 0.3, max_tokens: 8192
+            })
+        });
+        if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error?.message || res.statusText); }
+        const data = await res.json();
+        mdTargetText.textContent = data.choices?.[0]?.message?.content?.trim() || '';
+        mdTargetCount.textContent = `${mdTargetText.textContent.length} 字符`;
+        showToast('Markdown 翻译完成', 'success');
+    } catch (err) {
+        mdTargetText.textContent = `❌ 翻译失败: ${err.message}`;
+    } finally {
+        mdTranslateBtn.classList.remove('loading'); mdTranslateBtn.disabled = false;
     }
 });
 
