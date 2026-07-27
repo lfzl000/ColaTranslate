@@ -254,8 +254,8 @@ body::before {
 
 .text-input, .text-output {
     width: 100%;
-    min-height: 200px;
-    max-height: 400px;
+    min-height: 160px;
+    max-height: 360px;
     border: none;
     outline: none;
     resize: vertical;
@@ -265,9 +265,11 @@ body::before {
     background: transparent;
     font-family: inherit;
     transition: color var(--transition);
+    overflow-y: auto;
+    word-break: break-word;
 }
 .text-input::placeholder { color: var(--text-secondary); opacity: 0.6; }
-.text-output { cursor: default; }
+.text-output { cursor: default; resize: none; }
 
 .char-count {
     font-size: 0.75rem;
