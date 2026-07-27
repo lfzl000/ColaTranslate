@@ -245,6 +245,8 @@ swapBtn.addEventListener('click', () => {
 clearBtn.addEventListener('click', () => {
     sourceText.value = '';
     targetText.textContent = '';
+    sourceText.style.height = '';
+    targetText.style.minHeight = '';
     updateCounts();
     sourceText.focus();
 });
