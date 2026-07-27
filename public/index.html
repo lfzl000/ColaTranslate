@@ -1449,7 +1449,8 @@ modeTabs.forEach(tab => {
 // ====== Code Naming ======
 let namingTimer;
 namingInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
+    // Ctrl+Enter or Cmd+Enter to submit
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
         e.preventDefault();
         generateName();
     }
