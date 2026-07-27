@@ -1067,15 +1067,21 @@ body::before {
                 </div>
             </div>
             <div class="settings-group">
-                <label class="settings-label">🔗 API 请求地址（兼容 OpenAI 格式）</label>
-                <input type="text" class="settings-input" id="apiBaseInput"
-                    placeholder="https://api.deepseek.com/v1">
-                <div class="settings-hint">支持任何兼容 OpenAI Response 的 API，如 DeepSeek / OpenAI / 自定义代理</div>
+                <label class="settings-label">🔌 模型来源</label>
+                <div class="settings-options" id="providerOptions">
+                    <button class="settings-option active" data-provider="deepseek">🐕 DeepSeek</button>
+                    <button class="settings-option" data-provider="openai">🔗 OpenAI 兼容</button>
+                </div>
             </div>
-            <div class="settings-group">
+            <div class="settings-group" id="apiBaseGroup" style="display:none">
+                <label class="settings-label">🔗 API 请求地址</label>
+                <input type="text" class="settings-input" id="apiBaseInput"
+                    placeholder="https://api.openai.com/v1">
+            </div>
+            <div class="settings-group" id="modelGroup" style="display:none">
                 <label class="settings-label">🤖 模型名称</label>
                 <input type="text" class="settings-input" id="modelInput"
-                    placeholder="deepseek-v4-flash">
+                    placeholder="gpt-4o-mini">
             </div>
             <div class="settings-group">
                 <label class="settings-label">🔑 API Key</label>

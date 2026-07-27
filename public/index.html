@@ -1069,18 +1069,24 @@ body::before {
                 </div>
             </div>
             <div class="settings-group">
-                <label class="settings-label">🔗 API 请求地址（兼容 OpenAI 格式）</label>
-                <input type="text" class="settings-input" id="apiBaseInput"
-                    placeholder="https://api.deepseek.com/v1">
-                <div class="settings-hint">支持任何兼容 OpenAI Response 的 API，如 DeepSeek / OpenAI / 自定义代理</div>
+                <label class="settings-label">🔌 模型来源</label>
+                <div class="settings-options" id="providerOptions">
+                    <button class="settings-option active" data-provider="deepseek">🐕 DeepSeek</button>
+                    <button class="settings-option" data-provider="openai">🔗 OpenAI 兼容</button>
+                </div>
             </div>
-            <div class="settings-group">
+            <div class="settings-group" id="apiBaseGroup" style="display:none">
+                <label class="settings-label">🔗 API 请求地址</label>
+                <input type="text" class="settings-input" id="apiBaseInput"
+                    placeholder="https://api.openai.com/v1">
+            </div>
+            <div class="settings-group" id="modelGroup" style="display:none">
                 <label class="settings-label">🤖 模型名称</label>
                 <input type="text" class="settings-input" id="modelInput"
-                    placeholder="deepseek-v4-flash">
+                    placeholder="gpt-4o-mini">
             </div>
             <div class="settings-group">
-                <label class="settings-label">🔑 DeepSeek API Key</label>
+                <label class="settings-label">🔑 API Key</label>
                 <input type="password" class="settings-input" id="apiKeyInput"
                     placeholder="sk-...">
                 <div class="settings-hint" id="apiKeyHint"></div>
@@ -1131,6 +1137,7 @@ const apiKeyInput = document.getElementById('apiKeyInput');
 const apiKeyHint = document.getElementById('apiKeyHint');
 
 let currentTheme = localStorage.getItem('ai-translator-theme') || 'system';
+let currentProvider = localStorage.getItem('ai-translator-provider') || 'deepseek';
 
 // Apply theme (system-aware)
 function applyTheme(mode) {
@@ -1154,29 +1161,44 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () 
 
 // Settings modal
 settingsBtn.addEventListener('click', () => {
-    // Sync state
     document.querySelectorAll('.settings-option').forEach(opt => {
         opt.classList.toggle('active', opt.dataset.theme === currentTheme);
     });
     apiKeyInput.value = currentApiKey;
-    const apiBaseInput = document.getElementById('apiBaseInput');
-    const modelInput = document.getElementById('modelInput');
-    if (apiBaseInput) apiBaseInput.value = currentApiBase;
-    if (modelInput) modelInput.value = currentModel;
+    document.getElementById('apiBaseInput').value = currentApiBase;
+    document.getElementById('modelInput').value = currentModel;
+    updateProviderUI();
     updateApiKeyHint();
     settingsOverlay.style.display = 'flex';
     apiKeyInput.focus();
 });
 
-settingsClose.addEventListener('click', () => { settingsOverlay.style.display = 'none'; });
+function updateProviderUI() {
+    const isOpenAI = currentProvider === 'openai';
+    document.querySelectorAll('#providerOptions .settings-option').forEach(opt => {
+        opt.classList.toggle('active', opt.dataset.provider === currentProvider);
+    });
+    document.getElementById('apiBaseGroup').style.display = isOpenAI ? '' : 'none';
+    document.getElementById('modelGroup').style.display = isOpenAI ? '' : 'none';
+}
+
+// Provider option click
 settingsOverlay.addEventListener('click', (e) => {
+    const popt = e.target.closest('#providerOptions .settings-option');
+    if (popt) {
+        currentProvider = popt.dataset.provider;
+        updateProviderUI();
+        return;
+    }
     if (e.target === settingsOverlay) settingsOverlay.style.display = 'none';
 });
 
-// Theme option click
+settingsClose.addEventListener('click', () => { settingsOverlay.style.display = 'none'; });
+
+// Theme option click (only for theme options, not provider)
 settingsOverlay.addEventListener('click', (e) => {
     const opt = e.target.closest('.settings-option');
-    if (!opt) return;
+    if (!opt || !opt.dataset.theme) return;
     currentTheme = opt.dataset.theme;
     document.querySelectorAll('.settings-option').forEach(o => o.classList.remove('active'));
     opt.classList.add('active');
@@ -1196,20 +1218,23 @@ function updateApiKeyHint() {
 settingsSave.addEventListener('click', () => {
     const newTheme = currentTheme;
     const newKey = apiKeyInput.value.trim();
-    const newBase = (document.getElementById('apiBaseInput')?.value || '').trim() || 'https://api.deepseek.com/v1';
-    const newModel = (document.getElementById('modelInput')?.value || '').trim() || 'deepseek-v4-flash';
+    const isOpenAI = currentProvider === 'openai';
+    const newBase = isOpenAI
+        ? ((document.getElementById('apiBaseInput')?.value || '').trim() || 'https://api.openai.com/v1')
+        : 'https://api.deepseek.com/v1';
+    const newModel = isOpenAI
+        ? ((document.getElementById('modelInput')?.value || '').trim() || 'gpt-4o-mini')
+        : 'deepseek-v4-flash';
 
-    if (newKey && !newKey.startsWith('sk-') && newBase.includes('deepseek')) {
-        showToast('DeepSeek API Key 应以 sk- 开头', 'error');
-        return;
-    }
     currentApiKey = newKey;
     currentApiBase = newBase;
     currentModel = newModel;
+    localStorage.setItem('ai-translator-provider', currentProvider);
     localStorage.setItem('ai-translator-api-key', currentApiKey);
     localStorage.setItem('ai-translator-api-base', currentApiBase);
     localStorage.setItem('ai-translator-model', currentModel);
     localStorage.setItem('ai-translator-theme', newTheme);
+    localStorage.setItem('ai-translator-provider', currentProvider);
 
     applyTheme(newTheme);
     settingsOverlay.style.display = 'none';
