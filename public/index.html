@@ -1370,7 +1370,8 @@ async function streamTranslate(text, src, tgt) {
                 const data = line.slice(6).trim();
                 if (data === '[DONE]') continue;
                 try {
-                    const parsed = JSON.parse(data);
+                    const parsed = safeJSONParse(data, null);
+                    if (!parsed) continue;
                     const content = parsed.choices?.[0]?.delta?.content || '';
                     if (content) {
                         fullText += content;
@@ -1521,7 +1522,7 @@ async function generateName() {
 
         const data = await res.json();
         const content = data.choices?.[0]?.message?.content?.trim() || '';
-        const result = JSON.parse(content);
+        const result = safeJSONParse(content, { candidates: [] });
         window._lastCandidates = result.candidates || [];
         renderCandidates(window._lastCandidates);
     } catch (err) {
@@ -1614,7 +1615,7 @@ async function doBatchNaming(lines) {
         });
         if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error?.message || res.statusText); }
         const data = await res.json();
-        const result = JSON.parse(data.choices?.[0]?.message?.content?.trim() || '{"items":[]}');
+        const result = safeJSONParse(data.choices?.[0]?.message?.content?.trim() || '', { items: [] });
         window._lastBatchResults = result.items || [];
         window._lastCandidates = null;
         renderBatchResults(window._lastBatchResults);
@@ -1717,6 +1718,22 @@ function escapeHtml(str) {
     const div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
+}
+
+// Safe JSON parse with repair for common AI response issues
+function safeJSONParse(str, fallback) {
+    try {
+        return JSON.parse(str);
+    } catch (e) {
+        // Try to fix common issues: unescaped quotes inside strings, trailing commas
+        const cleaned = str
+            .replace(/\n/g, '\\n')
+            .replace(/\r/g, '')
+            .replace(/,\s*}/g, '}')
+            .replace(/,\s*]/g, ']');
+        try { return JSON.parse(cleaned); } catch (e2) {}
+        return fallback;
+    }
 }
 
 // Ensure API Key is set before any operation
