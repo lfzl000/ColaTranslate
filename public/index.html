@@ -1448,13 +1448,12 @@ ${styleGuide}
 }
 
 async function normalTranslate(text, src, tgt) {
-    const res = await fetch(getApiUrl(), {
+    const res = await fetch('/api/proxy', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${currentApiKey}`
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+            apiBase: currentApiBase,
+            apiKey: currentApiKey,
             model: currentModel,
             messages: [
                 { role: 'system', content: buildTranslatePrompt(text, src, tgt, currentStyle) },
@@ -1481,13 +1480,12 @@ async function streamTranslate(text, src, tgt) {
     targetText.classList.add('streaming-cursor');
     let fullText = '';
 
-    const res = await fetch(getApiUrl(), {
+    const res = await fetch('/api/proxy', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${currentApiKey}`
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+            apiBase: currentApiBase,
+            apiKey: currentApiKey,
             model: currentModel,
             messages: [
                 { role: 'system', content: buildTranslatePrompt(text, src, tgt, currentStyle) },
@@ -1629,13 +1627,12 @@ async function generateName() {
     namingResults.innerHTML = '<div class="naming-placeholder" style="padding:1.5rem">⏳ 正在生成命名方案...</div>';
 
     try {
-        const res = await fetch(getApiUrl(), {
+        const res = await fetch('/api/proxy', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${currentApiKey}`
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
+                apiBase: currentApiBase,
+                apiKey: currentApiKey,
                 model: currentModel,
                 messages: [
                     { role: 'system', content: `你是一个专业的代码命名助手。用户输入一个中文词语或短语，你需要给出 3~5 个不同的英文代码命名方案。
@@ -1759,7 +1756,7 @@ async function doBatchNaming(lines) {
     document.getElementById('formatSelector').style.display = 'none';
 
     try {
-        const res = await fetch(getApiUrl(), {
+        const res = await fetch('/api/proxy', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentApiKey}` },
             body: JSON.stringify({
@@ -1846,7 +1843,7 @@ mdTranslateBtn.addEventListener('click', async () => {
     mdTargetText.textContent = '';
 
     try {
-        const res = await fetch(getApiUrl(), {
+        const res = await fetch('/api/proxy', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentApiKey}` },
             body: JSON.stringify({

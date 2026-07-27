@@ -19,6 +19,8 @@ app.post('/api/translate', async (req, res) => {
     }
 
     const apiKey = req.body.apiKey || process.env.DEEPSEEK_API_KEY;
+    const apiBase = req.body.apiBase || 'https://api.deepseek.com/v1';
+    const model = req.body.model || 'deepseek-v4-flash';
     if (!apiKey || apiKey === 'sk-your-api-key-here') {
         return res.status(401).json({
             error: '请先配置 DEEPSEEK_API_KEY',
@@ -51,14 +53,14 @@ ${styleGuide}
 4. 只返回翻译结果，不要添加任何解释或说明`;
 
     try {
-        const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+        const response = await fetch(`${apiBase.replace(/\/+$/, '')}/chat/completions`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${apiKey}`
             },
             body: JSON.stringify({
-                model: 'deepseek-v4-flash',
+                model,
                 messages: [
                     { role: 'system', content: systemPrompt },
                     { role: 'user', content: text }
@@ -105,6 +107,8 @@ app.post('/api/translate/stream', async (req, res) => {
     }
 
     const apiKey = req.body.apiKey || process.env.DEEPSEEK_API_KEY;
+    const apiBase = req.body.apiBase || 'https://api.deepseek.com/v1';
+    const model = req.body.model || 'deepseek-v4-flash';
     if (!apiKey || apiKey === 'sk-your-api-key-here') {
         return res.status(401).json({ error: '请先配置 DEEPSEEK_API_KEY' });
     }
@@ -138,14 +142,14 @@ ${styleGuide}
     res.setHeader('Connection', 'keep-alive');
 
     try {
-        const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+        const response = await fetch(`${apiBase.replace(/\/+$/, '')}/chat/completions`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${apiKey}`
             },
             body: JSON.stringify({
-                model: 'deepseek-v4-flash',
+                model,
                 messages: [
                     { role: 'system', content: systemPrompt },
                     { role: 'user', content: text }
@@ -211,6 +215,8 @@ app.post('/api/name-code', async (req, res) => {
     }
 
     const apiKey = req.body.apiKey || process.env.DEEPSEEK_API_KEY;
+    const apiBase = req.body.apiBase || 'https://api.deepseek.com/v1';
+    const model = req.body.model || 'deepseek-v4-flash';
     if (!apiKey || apiKey === 'sk-your-api-key-here') {
         return res.status(401).json({ error: '请先配置 DEEPSEEK_API_KEY' });
     }
@@ -240,14 +246,14 @@ app.post('/api/name-code', async (req, res) => {
 }`;
 
     try {
-        const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+        const response = await fetch(`${apiBase.replace(/\/+$/, '')}/chat/completions`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${apiKey}`
             },
             body: JSON.stringify({
-                model: 'deepseek-v4-flash',
+                model,
                 messages: [
                     { role: 'system', content: systemPrompt },
                     { role: 'user', content: text }
@@ -281,6 +287,59 @@ app.post('/api/name-code', async (req, res) => {
             error: '生成命名失败',
             detail: err.message
         });
+    }
+});
+
+// 通用代理端点 — 转发到用户自定义 API
+app.post('/api/proxy', async (req, res) => {
+    const { apiBase, apiKey, model, messages, temperature, max_tokens, response_format, stream } = req.body;
+
+    if (!apiKey) {
+        return res.status(401).json({ error: '请先设置 API Key' });
+    }
+
+    const base = (apiBase || 'https://api.deepseek.com/v1').replace(/\/+$/, '');
+    const url = `${base}/chat/completions`;
+
+    try {
+        const fetchRes = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: model || 'deepseek-v4-flash',
+                messages,
+                temperature: temperature ?? 0.3,
+                max_tokens: max_tokens || 4096,
+                ...(response_format ? { response_format } : {}),
+                ...(stream ? { stream: true } : {})
+            })
+        });
+
+        if (!fetchRes.ok) {
+            const err = await fetchRes.json().catch(() => ({}));
+            return res.status(fetchRes.status).json({ error: err.error?.message || fetchRes.statusText });
+        }
+
+        if (stream) {
+            const reader = fetchRes.body.getReader();
+            res.setHeader('Content-Type', 'text/event-stream');
+            res.setHeader('Cache-Control', 'no-cache');
+            res.setHeader('Connection', 'keep-alive');
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) { res.end(); break; }
+                res.write(value);
+            }
+        } else {
+            const data = await fetchRes.json();
+            res.json(data);
+        }
+    } catch (err) {
+        console.error('代理请求失败:', err.message);
+        res.status(500).json({ error: err.message });
     }
 });
 
