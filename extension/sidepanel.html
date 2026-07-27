@@ -248,6 +248,8 @@ body::before {
     display: flex;
     flex-direction: column;
     transition: background var(--transition);
+    min-width: 0;
+    overflow: hidden;
 }
 
 .text-input, .text-output {
@@ -264,7 +266,10 @@ body::before {
     font-family: inherit;
     transition: color var(--transition);
     overflow-y: auto;
+    overflow-x: hidden;
     word-break: break-word;
+    overflow-wrap: anywhere;
+    max-width: 100%;
 }
 .text-input::placeholder { color: var(--text-secondary); opacity: 0.6; }
 .text-output { cursor: default; resize: none; }
