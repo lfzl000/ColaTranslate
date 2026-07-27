@@ -345,6 +345,18 @@ clearBtn.addEventListener('click', () => {
 function updateCounts() {
     sourceCount.textContent = `${sourceText.value.length} 字符`;
     targetCount.textContent = `${targetText.textContent.length} 字符`;
+    autoResize(sourceText);
+    autoResize(targetText);
+}
+
+function autoResize(el) {
+    el.style.height = 'auto';
+    const h = Math.max(160, Math.min(el.scrollHeight, 600));
+    if (el.tagName === 'DIV') {
+        el.style.minHeight = h + 'px';
+    } else {
+        el.style.height = h + 'px';
+    }
 }
 
 // ====== Keyboard Shortcuts ======
