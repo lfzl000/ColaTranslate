@@ -670,9 +670,9 @@ body::before {
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 .settings-modal {
     background: var(--surface);
-    border-radius: 20px;
-    width: 90%;
-    max-width: 420px;
+    border-radius: 16px;
+    width: 92%;
+    max-width: 580px;
     box-shadow: 0 20px 60px rgba(0,0,0,0.2);
     overflow: hidden;
     animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
@@ -700,18 +700,19 @@ body::before {
     justify-content: center;
 }
 .settings-close:hover { background: var(--border); color: var(--text); }
-.settings-body { padding: 1.25rem 1.5rem; display: grid; gap: 1.25rem; }
-.settings-group { display: grid; gap: 0.5rem; }
-.settings-label { font-size: 0.85rem; font-weight: 600; color: var(--text); }
-.settings-options { display: flex; gap: 0.4rem; }
+.settings-body { padding: 1rem 1.25rem; display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem; max-height: 60vh; overflow-y: auto; }
+.settings-body > .settings-full { grid-column: 1 / -1; }
+.settings-group { display: grid; gap: 0.4rem; }
+.settings-label { font-size: 0.8rem; font-weight: 600; color: var(--text); }
+.settings-options { display: flex; gap: 0.3rem; }
 .settings-option {
     flex: 1;
-    padding: 0.55rem 0.5rem;
-    border-radius: 10px;
+    padding: 0.4rem 0.4rem;
+    border-radius: 8px;
     border: 2px solid var(--border);
     background: var(--surface);
     color: var(--text-secondary);
-    font-size: 0.82rem;
+    font-size: 0.78rem;
     font-weight: 500;
     cursor: pointer;
     transition: all var(--transition);
@@ -1102,50 +1103,44 @@ body::before {
                 <div class="settings-options">
                     <button class="settings-option active" data-theme="light">☀️ 浅色</button>
                     <button class="settings-option" data-theme="dark">🌙 深色</button>
-                    <button class="settings-option" data-theme="system">💻 跟随系统</button>
+                    <button class="settings-option" data-theme="system">💻 跟随</button>
                 </div>
             </div>
             <div class="settings-group">
                 <label class="settings-label">🔌 模型来源</label>
                 <div class="settings-options" id="providerOptions">
                     <button class="settings-option active" data-provider="deepseek">🐕 DeepSeek</button>
-                    <button class="settings-option" data-provider="openai">🔗 OpenAI 兼容</button>
+                    <button class="settings-option" data-provider="openai">🔗 OpenAI</button>
                 </div>
             </div>
-            <div class="settings-group" id="apiBaseGroup" style="display:none">
-                <label class="settings-label">🔗 API 请求地址</label>
-                <input type="text" class="settings-input" id="apiBaseInput"
+            <div class="settings-group">
+                <label class="settings-label">🤖 模型名称 <span class="settings-hint" style="display:inline;margin:0" id="modelHint"></span></label>
+                <input type="text" class="settings-input" id="modelInput"
+                    placeholder="deepseek-v4-flash">
+                <div style="display:flex;gap:0.3rem;align-items:center">
+                    <button class="settings-fetch-btn" id="fetchModelsBtn" style="margin:0;flex:1">🔄 获取可用模型</button>
+                </div>
+                <select class="settings-input" id="modelSelect" multiple size="3" style="display:none;margin-top:0.3rem;font-size:0.78rem"></select>
+                <input type="text" class="settings-input" id="apiBaseInput" style="display:none"
                     placeholder="https://api.openai.com/v1">
-            </div>
-            <div class="settings-group" id="modelGroup" style="display:none">
-                <label class="settings-label">🤖 模型名称</label>
-                <div style="display:flex;gap:0.5rem">
-                    <select class="settings-input" id="modelSelect" style="flex:1;display:none"></select>
-                    <input type="text" class="settings-input" id="modelInput" style="flex:1"
-                        placeholder="gpt-4o-mini">
-                </div>
-                <button class="settings-fetch-btn" id="fetchModelsBtn" style="display:none">🔄 获取可用模型</button>
-                <div class="settings-hint" id="modelHint" style="display:none"></div>
             </div>
             <div class="settings-group">
                 <label class="settings-label">🔑 API Key</label>
                 <input type="password" class="settings-input" id="apiKeyInput"
                     placeholder="sk-...">
-                <div class="settings-hint" id="apiKeyHint"></div>
-                <div class="settings-hint">
+                <div class="settings-hint" id="apiKeyHint" style="margin:0"></div>
+            </div>
+            <div class="settings-group settings-full">
+                <div class="settings-hint" style="text-align:center">
                     获取 Key：<a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noopener" style="color:var(--primary);font-weight:500;">platform.deepseek.com/api_keys ↗</a>
                 </div>
-                <div class="settings-hint">
-                    密钥仅保存在浏览器本地，不会上传到服务器
-                </div>
             </div>
-            <div class="settings-group" id="shortcutGroup" style="display:none">
-                <label class="settings-label">⌨️ 全局快捷键（显示/隐藏窗口）</label>
-                <div style="display:flex;gap:0.5rem">
-                    <input type="text" class="settings-input" id="shortcutInput" placeholder="CommandOrControl+Shift+T" readonly style="cursor:pointer;text-align:center;font-size:0.85rem;font-weight:600;">
-                    <button class="settings-fetch-btn" id="recordShortcutBtn" style="width:auto;padding:0.45rem 0.8rem;flex-shrink:0;">🎹 录制</button>
+            <div class="settings-group settings-full" id="shortcutGroup" style="display:none">
+                <div style="display:flex;gap:0.5rem;align-items:center">
+                    <span class="settings-label" style="margin:0">⌨️ 全局快捷键</span>
+                    <input type="text" class="settings-input" id="shortcutInput" placeholder="CommandOrControl+Shift+T" readonly style="flex:1;cursor:pointer;text-align:center;font-size:0.85rem;font-weight:600;">
+                    <button class="settings-fetch-btn" id="recordShortcutBtn" style="width:auto;padding:0.4rem 0.8rem;flex-shrink:0;margin:0">🎹 录制</button>
                 </div>
-                <div class="settings-hint">点击"录制"后按下组合键，支持 Ctrl/Shift/Alt/Meta + 字母</div>
             </div>
         </div>
         <div class="settings-footer">
@@ -1233,11 +1228,8 @@ function updateProviderUI() {
     document.querySelectorAll('#providerOptions .settings-option').forEach(opt => {
         opt.classList.toggle('active', opt.dataset.provider === currentProvider);
     });
-    document.getElementById('apiBaseGroup').style.display = isOpenAI ? '' : 'none';
-    document.getElementById('modelGroup').style.display = '';  // always show
-    document.getElementById('fetchModelsBtn').style.display = '';  // always show
+    document.getElementById('apiBaseInput').style.display = isOpenAI ? '' : 'none';
     document.getElementById('modelSelect').style.display = 'none';
-    document.getElementById('modelInput').style.display = '';
 }
 
 // Fetch available models from API
@@ -1266,14 +1258,12 @@ document.getElementById('fetchModelsBtn').addEventListener('click', async () => 
             const select = document.getElementById('modelSelect');
             select.innerHTML = models.map(m => `<option value="${m}">${m}</option>`).join('');
             select.style.display = '';
-            document.getElementById('modelInput').style.display = 'none';
-            select.addEventListener('change', () => {
+            select.onchange = () => {
                 document.getElementById('modelInput').value = select.value;
-            });
+            };
             select.value = models[0];
             document.getElementById('modelInput').value = models[0];
-            hint.textContent = `✅ 找到 ${models.length} 个可用模型`;
-            hint.style.color = 'var(--success)';
+            hint.textContent = `✅ ${models.length} 个模型`;
         } else {
             hint.textContent = '⚠️ 未找到可用模型，请手动输入';
             hint.style.color = 'var(--danger)';
@@ -1294,7 +1284,6 @@ settingsOverlay.addEventListener('click', (e) => {
     const popt = e.target.closest('#providerOptions .settings-option');
     if (popt) {
         currentProvider = popt.dataset.provider;
-        // Load saved config for this provider
         const cfg = loadProviderConfig(currentProvider);
         currentApiBase = cfg.apiBase;
         currentApiKey = cfg.apiKey;
@@ -1303,8 +1292,7 @@ settingsOverlay.addEventListener('click', (e) => {
         document.getElementById('apiBaseInput').value = currentApiBase;
         document.getElementById('modelInput').value = currentModel;
         document.getElementById('modelSelect').style.display = 'none';
-        document.getElementById('modelInput').style.display = '';
-        document.getElementById('modelHint').style.display = 'none';
+        document.getElementById('modelHint').textContent = '';
         updateProviderUI();
         updateApiKeyHint();
         return;
