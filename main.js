@@ -23,7 +23,7 @@ async function createWindow() {
     minWidth: 360,
     minHeight: 500,
     title: '可乐翻译助手',
-    icon: path.join(__dirname, 'extension', 'icons', 'icon128.png'),
+    icon: path.join(__dirname, 'extension', 'icons', 'icon512.png'),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true
