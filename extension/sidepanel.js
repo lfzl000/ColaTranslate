@@ -353,7 +353,7 @@ function updateCounts() {
 
 function autoResize(el) {
     el.style.height = 'auto';
-    const h = Math.max(160, Math.min(el.scrollHeight, 600));
+    const h = Math.max(120, Math.min(el.scrollHeight, 600));
     if (el.tagName === 'DIV') {
         el.style.minHeight = h + 'px';
     } else {

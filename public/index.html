@@ -94,7 +94,7 @@ body::before {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 1.5rem;
+    margin-bottom: 1rem;
 }
 
 .logo {
@@ -154,7 +154,7 @@ body::before {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 1.25rem 1.5rem;
+    padding: 0.85rem 1.25rem;
     border-bottom: 1px solid var(--border);
     flex-wrap: wrap;
 }
@@ -246,7 +246,7 @@ body::before {
 
 .text-panel {
     background: var(--surface);
-    padding: 1.5rem;
+    padding: 1rem 1.25rem;
     display: flex;
     flex-direction: column;
     transition: background var(--transition);
@@ -256,7 +256,7 @@ body::before {
 
 .text-input, .text-output {
     width: 100%;
-    min-height: 160px;
+    min-height: 120px;
     border: none;
     outline: none;
     resize: vertical;
@@ -1502,8 +1502,7 @@ function updateCounts() {
 
 function autoResize(el) {
     el.style.height = 'auto';
-    const h = Math.max(160, Math.min(el.scrollHeight, 600));
-    // For div elements, also set min-height directly
+    const h = Math.max(120, Math.min(el.scrollHeight, 600));
     if (el.tagName === 'DIV') {
         el.style.minHeight = h + 'px';
     } else {
