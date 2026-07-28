@@ -2259,23 +2259,23 @@ if (isElectron) {
 
     document.addEventListener('keydown', (e) => {
         if (!recording) return;
+        // 忽略纯修饰键（Command/Shift/Alt/Ctrl 单独按）
+        if (['Meta','Control','Shift','Alt','CapsLock','Tab','Escape'].includes(e.key)) return;
         e.preventDefault();
+        e.stopPropagation();
         const parts = [];
         if (e.metaKey || e.ctrlKey) parts.push('CommandOrControl');
         if (e.shiftKey) parts.push('Shift');
         if (e.altKey) parts.push('Alt');
-        const keyName = e.key.length === 1 ? e.key.toUpperCase() : e.key;
+        const keyName = e.key.length === 1 ? e.key.toUpperCase() : (e.code.startsWith('Key') ? e.code.slice(3) : e.key);
         parts.push(keyName);
         const shortcut = parts.join('+');
-        if (/CommandOrControl\+Shift\+T/.test(shortcut)) {
-        }
         shortcutInput.value = shortcut;
         recording = false;
         recordBtn.textContent = '🎹 录制';
         recordBtn.style.borderColor = '';
         recordBtn.style.background = '';
 
-        // 保存到后端
         fetch('/api/shortcut', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
