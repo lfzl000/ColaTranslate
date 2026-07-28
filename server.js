@@ -301,6 +301,15 @@ app.post('/api/proxy', async (req, res) => {
     const base = (apiBase || 'https://api.deepseek.com/v1').replace(/\/+$/, '');
     const url = `${base}/chat/completions`;
 
+    // 提取用户消息用于日志
+    const userMsg = (messages || []).find(m => m.role === 'user')?.content || '';
+    const srcPreview = userMsg.length > 80 ? userMsg.slice(0, 80) + '…' : userMsg;
+    const startTime = Date.now();
+
+    console.log(`\n📨 [${new Date().toLocaleTimeString()}] 翻译请求`);
+    console.log(`   模型: ${model || 'default'}  |  字数: ${userMsg.length}  |  ${stream ? '流式' : '普通'}`);
+    console.log(`   内容: ${srcPreview.replace(/\n/g, '↵')}`);
+
     try {
         const fetchRes = await fetch(url, {
             method: 'POST',
@@ -320,6 +329,7 @@ app.post('/api/proxy', async (req, res) => {
 
         if (!fetchRes.ok) {
             const err = await fetchRes.json().catch(() => ({}));
+            console.error(`   ❌ HTTP ${fetchRes.status}: ${err.error?.message || fetchRes.statusText}`);
             return res.status(fetchRes.status).json({ error: err.error?.message || fetchRes.statusText });
         }
 
@@ -330,15 +340,24 @@ app.post('/api/proxy', async (req, res) => {
             res.setHeader('Connection', 'keep-alive');
             while (true) {
                 const { done, value } = await reader.read();
-                if (done) { res.end(); break; }
+                if (done) {
+                    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+                    console.log(`   ✅ 流式完成  |  耗时: ${elapsed}s`);
+                    res.end();
+                    break;
+                }
                 res.write(value);
             }
         } else {
             const data = await fetchRes.json();
+            const content = data.choices?.[0]?.message?.content?.trim() || '';
+            const tokens = data.usage?.total_tokens || '?';
+            const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+            console.log(`   ✅ 完成  |  tokens: ${tokens}  |  耗时: ${elapsed}s  |  结果: ${content.length} 字`);
             res.json(data);
         }
     } catch (err) {
-        console.error('代理请求失败:', err.message);
+        console.error(`   ❌ 代理请求失败: ${err.message}`);
         res.status(500).json({ error: err.message });
     }
 });
