@@ -3,5 +3,6 @@ node_modules/
 .workbuddy/
 deploy/
 dist/
+.shortcut.json
 *.log
 .DS_Store
