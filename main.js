@@ -18,10 +18,10 @@ async function createWindow() {
   }
 
   mainWindow = new BrowserWindow({
-    width: 440,
-    height: 700,
-    minWidth: 360,
-    minHeight: 500,
+    width: 760,
+    height: 520,
+    minWidth: 640,
+    minHeight: 420,
     title: '可乐翻译助手',
     icon: path.join(__dirname, 'extension', 'icons', 'icon512.png'),
     webPreferences: {
