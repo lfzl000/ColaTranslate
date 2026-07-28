@@ -374,14 +374,10 @@ function startServer(port) {
     });
 }
 
-// 直接运行 node server.js 时自动启动
-if (require.main === module) {
-    startServer().then(port => {
-        console.log(`📡 API 代理已就绪`);
-    });
-}
-
 // 全局快捷键配置（仅 Electron 使用）
+let onShortcutChange = null;
+function setShortcutCallback(cb) { onShortcutChange = cb; }
+
 const shortcutPath = path.join(__dirname, '.shortcut.json');
 app.get('/api/shortcut', (req, res) => {
     try { res.json(JSON.parse(fs.readFileSync(shortcutPath, 'utf8'))); }
@@ -391,7 +387,15 @@ app.post('/api/shortcut', (req, res) => {
     const { key } = req.body;
     if (!key) return res.status(400).json({ error: '缺少 key' });
     fs.writeFileSync(shortcutPath, JSON.stringify({ key }));
+    if (onShortcutChange) onShortcutChange(key);
     res.json({ ok: true, key });
 });
 
-module.exports = { startServer };
+// 直接运行 node server.js 时自动启动
+if (require.main === module) {
+    startServer().then(port => {
+        console.log(`📡 API 代理已就绪`);
+    });
+}
+
+module.exports = { startServer, setShortcutCallback };

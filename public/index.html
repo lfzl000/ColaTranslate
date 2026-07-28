@@ -2280,9 +2280,9 @@ if (isElectron) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ key: shortcut })
-        }).then(r => r.json()).then(d => {
+        }).then(r => r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`)).then(d => {
             showToast(`快捷键已更新: ${d.key}`, 'success');
-        }).catch(() => showToast('快捷键保存失败', 'error'));
+        }).catch(err => showToast(`保存失败: ${err}`, 'error'));
     });
 }
 

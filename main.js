@@ -1,13 +1,12 @@
 const { app, BrowserWindow, Tray, Menu, globalShortcut, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const { startServer } = require('./server');
+const { startServer, setShortcutCallback } = require('./server');
 
 let mainWindow;
 let tray = null;
 let serverPort = 3456;
 let isQuitting = false;
-let currentShortcut = 'CommandOrControl+Shift+T';
 
 function getIcon(name) {
   return path.join(__dirname, 'extension', 'icons', name);
@@ -57,9 +56,8 @@ async function createWindow() {
   });
 
   mainWindow.loadURL(`http://localhost:${serverPort}?electron=1`);
-  mainWindow.setTitle('🐕 可乐翻译���手');
+  mainWindow.setTitle('🐕 可乐翻译助手');
 
-  // Cmd+W: 隐藏到托盘，不退出
   mainWindow.on('close', (e) => {
     if (!isQuitting) {
       e.preventDefault();
@@ -69,46 +67,39 @@ async function createWindow() {
 }
 
 // 全局快捷键
-function loadShortcutConfig() {
-  const file = path.join(__dirname, '.shortcut.json');
-  try { return JSON.parse(fs.readFileSync(file, 'utf8')).key; }
-  catch { return 'CommandOrControl+Shift+T'; }
+function registerShortcut(key) {
+  const shortcut = key || loadDefaultShortcut();
+  globalShortcut.unregisterAll();
+  try {
+    globalShortcut.register(shortcut, showWindow);
+    console.log(`全局快捷键已注册: ${shortcut}`);
+  } catch (err) {
+    console.error(`快捷键注册失败 (${shortcut}):`, err.message);
+    const fallback = 'CommandOrControl+Shift+T';
+    globalShortcut.register(fallback, showWindow);
+    console.log(`回退到: ${fallback}`);
+  }
 }
 
-function registerShortcut() {
-  globalShortcut.unregisterAll();
-  currentShortcut = loadShortcutConfig();
-  try {
-    globalShortcut.register(currentShortcut, showWindow);
-    console.log(`全局快捷键已注册: ${currentShortcut}`);
-  } catch (err) {
-    console.error(`全局快捷键注册失败 (${currentShortcut}):`, err.message);
-    // 回退到默认
-    currentShortcut = 'CommandOrControl+Shift+T';
-    globalShortcut.register(currentShortcut, showWindow);
-  }
+function loadDefaultShortcut() {
+  try { return JSON.parse(fs.readFileSync(path.join(__dirname, '.shortcut.json'), 'utf8')).key; }
+  catch { return 'CommandOrControl+Shift+T'; }
 }
 
 app.whenReady().then(() => {
   createTray();
-  createWindow();
-  registerShortcut();
-
-  // 监听快捷键配置变更
-  const shortcutFile = path.join(__dirname, '.shortcut.json');
-  fs.watchFile(shortcutFile, { interval: 1000 }, registerShortcut);
+  setShortcutCallback(registerShortcut); // 服务端通知直接回调
+  createWindow().then(() => {
+    registerShortcut(loadDefaultShortcut());
+  });
 });
 
 app.on('before-quit', () => { isQuitting = true; });
-app.on('will-quit', () => {
-  globalShortcut.unregisterAll();
-  const shortcutFile = path.join(__dirname, '.shortcut.json');
-  fs.unwatchFile(shortcutFile);
-});
+app.on('will-quit', () => { globalShortcut.unregisterAll(); });
 
 app.on('window-all-closed', () => { /* tray & dock keep alive */ });
 
 app.on('activate', () => {
-  if (mainWindow === null) createWindow();
+  if (mainWindow === null) createWindow().then(() => registerShortcut(loadDefaultShortcut()));
   else showWindow();
 });
