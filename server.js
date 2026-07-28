@@ -1,15 +1,38 @@
 const express = require('express');
-const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3456;
+const UPSTREAM_TIMEOUT_MS = 120000;
+let apiToken = null;
+let activeServer = null;
 
-app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+app.use('/api', (req, res, next) => {
+    if (!apiToken || req.get('X-Cola-Token') === apiToken) return next();
+    return res.status(403).json({ error: '无权访问本地 API' });
+});
 app.use(express.static(path.join(__dirname, 'public')));
+
+function normalizeApiBase(value, fallback) {
+    const url = new URL(value || fallback);
+    if (!['http:', 'https:'].includes(url.protocol)) {
+        throw new Error('API 地址仅支持 HTTP 或 HTTPS');
+    }
+    if (url.username || url.password) {
+        throw new Error('API 地址不能包含用户名或密码');
+    }
+    return url.toString().replace(/\/+$/, '');
+}
+
+function fetchUpstream(url, options) {
+    return fetch(url, {
+        ...options,
+        signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)
+    });
+}
 
 // DeepSeek API 代理
 app.post('/api/translate', async (req, res) => {
@@ -20,7 +43,9 @@ app.post('/api/translate', async (req, res) => {
     }
 
     const apiKey = req.body.apiKey || process.env.DEEPSEEK_API_KEY;
-    const apiBase = req.body.apiBase || 'https://api.deepseek.com/v1';
+    let apiBase;
+    try { apiBase = normalizeApiBase(req.body.apiBase, 'https://api.deepseek.com/v1'); }
+    catch (err) { return res.status(400).json({ error: err.message }); }
     const model = req.body.model || 'deepseek-v4-flash';
     if (!apiKey || apiKey === 'sk-your-api-key-here') {
         return res.status(401).json({
@@ -54,7 +79,7 @@ ${styleGuide}
 4. 只返回翻译结果，不要添加任何解释或说明`;
 
     try {
-        const response = await fetch(`${apiBase.replace(/\/+$/, '')}/chat/completions`, {
+        const response = await fetchUpstream(`${apiBase}/chat/completions`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -108,7 +133,9 @@ app.post('/api/translate/stream', async (req, res) => {
     }
 
     const apiKey = req.body.apiKey || process.env.DEEPSEEK_API_KEY;
-    const apiBase = req.body.apiBase || 'https://api.deepseek.com/v1';
+    let apiBase;
+    try { apiBase = normalizeApiBase(req.body.apiBase, 'https://api.deepseek.com/v1'); }
+    catch (err) { return res.status(400).json({ error: err.message }); }
     const model = req.body.model || 'deepseek-v4-flash';
     if (!apiKey || apiKey === 'sk-your-api-key-here') {
         return res.status(401).json({ error: '请先配置 DEEPSEEK_API_KEY' });
@@ -143,7 +170,7 @@ ${styleGuide}
     res.setHeader('Connection', 'keep-alive');
 
     try {
-        const response = await fetch(`${apiBase.replace(/\/+$/, '')}/chat/completions`, {
+        const response = await fetchUpstream(`${apiBase}/chat/completions`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -216,7 +243,9 @@ app.post('/api/name-code', async (req, res) => {
     }
 
     const apiKey = req.body.apiKey || process.env.DEEPSEEK_API_KEY;
-    const apiBase = req.body.apiBase || 'https://api.deepseek.com/v1';
+    let apiBase;
+    try { apiBase = normalizeApiBase(req.body.apiBase, 'https://api.deepseek.com/v1'); }
+    catch (err) { return res.status(400).json({ error: err.message }); }
     const model = req.body.model || 'deepseek-v4-flash';
     if (!apiKey || apiKey === 'sk-your-api-key-here') {
         return res.status(401).json({ error: '请先配置 DEEPSEEK_API_KEY' });
@@ -247,7 +276,7 @@ app.post('/api/name-code', async (req, res) => {
 }`;
 
     try {
-        const response = await fetch(`${apiBase.replace(/\/+$/, '')}/chat/completions`, {
+        const response = await fetchUpstream(`${apiBase}/chat/completions`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -299,20 +328,19 @@ app.post('/api/proxy', async (req, res) => {
         return res.status(401).json({ error: '请先设置 API Key' });
     }
 
-    const base = (apiBase || 'https://api.deepseek.com/v1').replace(/\/+$/, '');
+    let base;
+    try { base = normalizeApiBase(apiBase, 'https://api.deepseek.com/v1'); }
+    catch (err) { return res.status(400).json({ error: err.message }); }
     const url = `${base}/chat/completions`;
 
-    // 提取用户消息用于日志
     const userMsg = (messages || []).find(m => m.role === 'user')?.content || '';
-    const srcPreview = userMsg.length > 80 ? userMsg.slice(0, 80) + '…' : userMsg;
     const startTime = Date.now();
 
     console.log(`\n📨 [${new Date().toLocaleTimeString()}] 翻译请求`);
     console.log(`   模型: ${model || 'default'}  |  字数: ${userMsg.length}  |  ${stream ? '流式' : '普通'}`);
-    console.log(`   内容: ${srcPreview.replace(/\n/g, '↵')}`);
 
     try {
-        const fetchRes = await fetch(url, {
+        const fetchRes = await fetchUpstream(url, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -365,17 +393,35 @@ app.post('/api/proxy', async (req, res) => {
 
 function startServer(port, options = {}) {
     return new Promise((resolve, reject) => {
-        const p = port || PORT;
-        const server = app.listen(p, () => {
-            console.log(`🐕 可乐翻译助手: http://localhost:${p}`);
+        if (activeServer?.listening) {
+            return resolve(activeServer.address().port);
+        }
+        const p = port ?? PORT;
+        const host = options.host || '127.0.0.1';
+        apiToken = options.authToken || null;
+        const server = app.listen(p, host, () => {
+            activeServer = server;
+            const actualPort = server.address().port;
+            console.log(`🐕 可乐翻译助手: http://${host}:${actualPort}`);
             // 初始化快捷键存储路径（Electron 打包后不能在 asar 里写）
             shortcutPath = options.userDataPath
                 ? path.join(options.userDataPath, '.shortcut.json')
                 : path.join(__dirname, '.shortcut.json');
             console.log(`快捷键配置路径: ${shortcutPath}`);
-            resolve(p);
+            resolve(actualPort);
         });
         server.on('error', reject);
+    });
+}
+
+function stopServer() {
+    return new Promise((resolve, reject) => {
+        if (!activeServer) return resolve();
+        activeServer.close(err => {
+            if (err) return reject(err);
+            activeServer = null;
+            resolve();
+        });
     });
 }
 
@@ -384,24 +430,43 @@ let onShortcutChange = null;
 function setShortcutCallback(cb) { onShortcutChange = cb; }
 
 let shortcutPath = path.join(__dirname, '.shortcut.json');
+const DEFAULT_SHORTCUT = 'CommandOrControl+Shift+T';
+
+function readShortcutKey() {
+    try { return JSON.parse(fs.readFileSync(shortcutPath, 'utf8')).key || DEFAULT_SHORTCUT; }
+    catch { return DEFAULT_SHORTCUT; }
+}
+
 app.get('/api/shortcut', (req, res) => {
-    try { res.json(JSON.parse(fs.readFileSync(shortcutPath, 'utf8'))); }
-    catch { res.json({ key: 'CommandOrControl+Shift+T' }); }
+    res.json({ key: readShortcutKey() });
 });
 app.post('/api/shortcut', (req, res) => {
-    const { key } = req.body;
+    const key = typeof req.body?.key === 'string' ? req.body.key.trim() : '';
     if (!key) return res.status(400).json({ error: '缺少 key' });
+
+    const previousKey = readShortcutKey();
+    let registration = { ok: true, key };
+
     try {
-        fs.writeFileSync(shortcutPath, JSON.stringify({ key }));
-        res.json({ ok: true, key });
-        // 异步回调，避免阻塞响应
-        if (onShortcutChange) setImmediate(() => {
-            try { onShortcutChange(key); }
-            catch (err) { console.error('快捷键回调失败:', err.message); }
-        });
+        if (onShortcutChange) registration = onShortcutChange(key) || { ok: false };
     } catch (err) {
+        registration = { ok: false, error: err.message };
+    }
+
+    if (!registration.ok) {
+        return res.status(409).json({ error: registration.error || '快捷键无效或已被其他应用占用' });
+    }
+
+    try {
+        fs.writeFileSync(shortcutPath, JSON.stringify({ key }, null, 2));
+        return res.json({ ok: true, key });
+    } catch (err) {
+        if (onShortcutChange && previousKey !== key) {
+            try { onShortcutChange(previousKey); }
+            catch (rollbackErr) { console.error('快捷键回滚失败:', rollbackErr.message); }
+        }
         console.error('快捷键保存失败:', err.message);
-        res.status(500).json({ error: err.message });
+        return res.status(500).json({ error: err.message });
     }
 });
 
@@ -412,4 +477,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = { startServer, setShortcutCallback };
+module.exports = { app, startServer, stopServer, setShortcutCallback, normalizeApiBase };

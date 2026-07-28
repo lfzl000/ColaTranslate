@@ -1154,9 +1154,25 @@ body::before {
 
 <script>
 // ====== State ======
+const pageParams = new URLSearchParams(window.location.search);
+const isElectron = pageParams.get('electron') === '1';
+const localApiToken = pageParams.get('token') || '';
 let currentStyle = 'auto';
 let useStream = false;
 let userPickedTarget = false;  // 用户是否手动选择了目标语言
+
+function fetchWithTimeout(url, options = {}, timeoutMs = 120000) {
+    return fetch(url, {
+        ...options,
+        signal: options.signal || AbortSignal.timeout(timeoutMs)
+    });
+}
+
+function localApiFetch(url, options = {}) {
+    const headers = { ...(options.headers || {}) };
+    if (localApiToken) headers['X-Cola-Token'] = localApiToken;
+    return fetchWithTimeout(url, { ...options, headers });
+}
 
 // ====== DOM Elements ======
 const sourceLang = document.getElementById('sourceLang');
@@ -1247,7 +1263,7 @@ document.getElementById('fetchModelsBtn').addEventListener('click', async () => 
     hint.style.display = 'none';
 
     try {
-        const res = await fetch(`${base}/models`, {
+        const res = await fetchWithTimeout(`${base}/models`, {
             headers: { 'Authorization': `Bearer ${key}` }
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -1256,7 +1272,12 @@ document.getElementById('fetchModelsBtn').addEventListener('click', async () => 
 
         if (models.length) {
             const select = document.getElementById('modelSelect');
-            select.innerHTML = models.map(m => `<option value="${m}">${m}</option>`).join('');
+            select.replaceChildren(...models.map(model => {
+                const option = document.createElement('option');
+                option.value = String(model);
+                option.textContent = String(model);
+                return option;
+            }));
             select.style.display = '';
             select.onchange = () => {
                 document.getElementById('modelInput').value = select.value;
@@ -1297,17 +1318,29 @@ settingsOverlay.addEventListener('click', (e) => {
         updateApiKeyHint();
         return;
     }
-    if (e.target === settingsOverlay) settingsOverlay.style.display = 'none';
+    if (e.target === settingsOverlay) closeSettingsWithoutSaving();
 });
 
-settingsClose.addEventListener('click', () => { settingsOverlay.style.display = 'none'; });
+function closeSettingsWithoutSaving() {
+    currentTheme = localStorage.getItem('ai-translator-theme') || 'system';
+    currentProvider = localStorage.getItem('ai-translator-provider') || 'deepseek';
+    const cfg = loadProviderConfig(currentProvider);
+    currentApiBase = cfg.apiBase;
+    currentApiKey = cfg.apiKey;
+    currentModel = cfg.model;
+    applyTheme(currentTheme);
+    updateModelBadge();
+    settingsOverlay.style.display = 'none';
+}
+
+settingsClose.addEventListener('click', closeSettingsWithoutSaving);
 
 // Theme option click (only for theme options, not provider)
 settingsOverlay.addEventListener('click', (e) => {
     const opt = e.target.closest('.settings-option');
     if (!opt || !opt.dataset.theme) return;
     currentTheme = opt.dataset.theme;
-    document.querySelectorAll('.settings-option').forEach(o => o.classList.remove('active'));
+    document.querySelectorAll('.settings-option[data-theme]').forEach(o => o.classList.remove('active'));
     opt.classList.add('active');
 });
 
@@ -1329,9 +1362,8 @@ settingsSave.addEventListener('click', () => {
     const newBase = isOpenAI
         ? ((document.getElementById('apiBaseInput')?.value || '').trim() || 'https://api.openai.com/v1')
         : 'https://api.deepseek.com/v1';
-    const newModel = isOpenAI
-        ? ((document.getElementById('modelInput')?.value || '').trim() || 'gpt-4o-mini')
-        : 'deepseek-v4-flash';
+    const newModel = (document.getElementById('modelInput')?.value || '').trim()
+        || (isOpenAI ? 'gpt-4o-mini' : 'deepseek-v4-flash');
 
     currentApiKey = newKey;
     currentApiBase = newBase;
@@ -1349,7 +1381,7 @@ settingsSave.addEventListener('click', () => {
 // Esc to close
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && settingsOverlay.style.display === 'flex') {
-        settingsOverlay.style.display = 'none';
+        closeSettingsWithoutSaving();
     }
 });
 
@@ -1585,7 +1617,7 @@ function saveProviderConfig(provider, apiKey, apiBase, model) {
 }
 
 // Active config (derived from current provider)
-const defaultCfg = loadProviderConfig('deepseek');
+const defaultCfg = loadProviderConfig(currentProvider);
 let currentApiBase = defaultCfg.apiBase;
 let currentApiKey = defaultCfg.apiKey;
 let currentModel = defaultCfg.model;
@@ -1622,7 +1654,7 @@ ${styleGuide}
 }
 
 async function normalTranslate(text, src, tgt) {
-    const res = await fetch('/api/proxy', {
+    const res = await localApiFetch('/api/proxy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1640,7 +1672,7 @@ async function normalTranslate(text, src, tgt) {
 
     if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error?.message || `HTTP ${res.status}`);
+        throw new Error(err.error || err.detail || `HTTP ${res.status}`);
     }
 
     const data = await res.json();
@@ -1654,7 +1686,7 @@ async function streamTranslate(text, src, tgt) {
     targetText.classList.add('streaming-cursor');
     let fullText = '';
 
-    const res = await fetch('/api/proxy', {
+    const res = await localApiFetch('/api/proxy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1674,7 +1706,7 @@ async function streamTranslate(text, src, tgt) {
     if (!res.ok) {
         targetText.classList.remove('streaming-cursor');
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error?.message || `HTTP ${res.status}`);
+        throw new Error(err.error || err.detail || `HTTP ${res.status}`);
     }
 
     const reader = res.body.getReader();
@@ -1801,7 +1833,7 @@ async function generateName() {
     namingResults.innerHTML = '<div class="naming-placeholder" style="padding:1.5rem">⏳ 正在生成命名方案...</div>';
 
     try {
-        const res = await fetch('/api/proxy', {
+        const res = await localApiFetch('/api/proxy', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1842,7 +1874,7 @@ async function generateName() {
 
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));
-            throw new Error(err.error?.message || `HTTP ${res.status}`);
+            throw new Error(err.error || err.detail || `HTTP ${res.status}`);
         }
 
         const data = await res.json();
@@ -1854,7 +1886,7 @@ async function generateName() {
         const namingText = window._lastCandidates.map(c => `${c.label || '方案'}：${c.camelCase} / ${c.PascalCase} / ${c.snake_case} / ${c['kebab-case']} - ${c.explanation}`).join('\n');
         addHistory('naming', text, namingText, 'zh', 'en');
     } catch (err) {
-        namingResults.innerHTML = `<div class="naming-placeholder" style="padding:1.5rem;color:var(--danger)">❌ ${err.message}</div>`;
+        namingResults.innerHTML = `<div class="naming-placeholder" style="padding:1.5rem;color:var(--danger)">❌ ${escapeHtml(err.message)}</div>`;
     }
 }
 
@@ -1891,14 +1923,14 @@ function renderCandidates(candidates) {
 
         const chips = casings.map(cs => {
             const val = c[cs.key] || '-';
-            return `<span class="casing-chip" data-value="${escapeHtml(val)}" title="点击复制">
+            return `<span class="casing-chip" data-value="${escapeAttribute(val)}" title="点击复制">
                 <span class="case-type">${cs.emoji} ${cs.label}</span> ${escapeHtml(val)}
             </span>`;
         }).join('');
 
         return `<div class="candidate-card">
             <div class="candidate-header">
-                <span class="candidate-label ${labelClass}">${labelText}</span>
+                <span class="candidate-label ${labelClass}">${escapeHtml(labelText)}</span>
             </div>
             <div class="candidate-casings">${chips}</div>
             <div class="candidate-explanation">💡 ${escapeHtml(c.explanation || '')}</div>
@@ -1930,10 +1962,12 @@ async function doBatchNaming(lines) {
     document.getElementById('formatSelector').style.display = 'none';
 
     try {
-        const res = await fetch('/api/proxy', {
+        const res = await localApiFetch('/api/proxy', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentApiKey}` },
             body: JSON.stringify({
+                apiBase: currentApiBase,
+                apiKey: currentApiKey,
                 model: currentModel,
                 messages: [{ role: 'system', content: `针对用户输入的每一行中文，给出对应的英文代码命名。严格按 JSON 格式返回：
 { "items": [{"chinese": "中文", "camelCase": "...", "PascalCase": "...", "snake_case": "...", "kebab-case": "..."}] }
@@ -1941,7 +1975,7 @@ async function doBatchNaming(lines) {
                 temperature: 0.3, max_tokens: 4096, response_format: { type: 'json_object' }
             })
         });
-        if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error?.message || res.statusText); }
+        if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || e.detail || res.statusText); }
         const data = await res.json();
         const result = safeJSONParse(data.choices?.[0]?.message?.content?.trim() || '', { items: [] });
         window._lastBatchResults = result.items || [];
@@ -1951,7 +1985,7 @@ async function doBatchNaming(lines) {
         addHistory('naming', lines.join('\n'), batchText, 'zh', 'en');
         showToast(`已生成 ${window._lastBatchResults.length} 个命名方案`, 'success');
     } catch (err) {
-        namingResults.innerHTML = `<div class="naming-placeholder" style="padding:1.5rem;color:var(--danger)">❌ ${err.message}</div>`;
+        namingResults.innerHTML = `<div class="naming-placeholder" style="padding:1.5rem;color:var(--danger)">❌ ${escapeHtml(err.message)}</div>`;
     }
 }
 
@@ -1966,7 +2000,7 @@ function renderBatchResults(items) {
     const html = items.map(item => `
         <div class="naming-row" style="flex-wrap:wrap;gap:0.5rem">
             <span style="font-weight:600;min-width:80px;color:var(--text);font-size:0.85rem">${escapeHtml(item.chinese)}</span>
-            ${casings.map(c => `<span class="casing-chip" data-value="${escapeHtml(item[c] || '-')}"><span class="case-type">${labels[c]}</span> ${escapeHtml(item[c] || '-')}</span>`).join('')}
+            ${casings.map(c => `<span class="casing-chip" data-value="${escapeAttribute(item[c] || '-')}"><span class="case-type">${labels[c]}</span> ${escapeHtml(item[c] || '-')}</span>`).join('')}
         </div>
     `).join('');
     namingResults.innerHTML = html;
@@ -2017,10 +2051,12 @@ mdTranslateBtn.addEventListener('click', async () => {
     mdTargetText.textContent = '';
 
     try {
-        const res = await fetch('/api/proxy', {
+        const res = await localApiFetch('/api/proxy', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentApiKey}` },
             body: JSON.stringify({
+                apiBase: currentApiBase,
+                apiKey: currentApiKey,
                 model: currentModel,
                 messages: [{ role: 'system', content: `你是 Markdown 翻译助手。将以下 Markdown 内容从${srcName}翻译成${tgtName}。
 规则：
@@ -2032,7 +2068,7 @@ mdTranslateBtn.addEventListener('click', async () => {
                 temperature: 0.3, max_tokens: 8192
             })
         });
-        if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error?.message || res.statusText); }
+        if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || e.detail || res.statusText); }
         const data = await res.json();
         mdTargetText.textContent = data.choices?.[0]?.message?.content?.trim() || '';
         mdTargetCount.textContent = `${mdTargetText.textContent.length} 字符`;
@@ -2047,8 +2083,14 @@ mdTranslateBtn.addEventListener('click', async () => {
 
 function escapeHtml(str) {
     const div = document.createElement('div');
-    div.textContent = str;
+    div.textContent = String(str ?? '');
     return div.innerHTML;
+}
+
+function escapeAttribute(str) {
+    return String(str ?? '').replace(/[&<>"']/g, char => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[char]);
 }
 
 // Safe JSON parse with repair for common AI response issues
@@ -2234,7 +2276,6 @@ historyList.addEventListener('click', (e) => {
 });
 
 // ====== Global Shortcut (Electron only) ======
-const isElectron = window.location.search.includes('electron=1');
 if (isElectron) {
     document.getElementById('shortcutGroup').style.display = '';
     const shortcutInput = document.getElementById('shortcutInput');
@@ -2242,7 +2283,7 @@ if (isElectron) {
     let recording = false;
 
     // 加载当前快捷键
-    fetch('/api/shortcut').then(r => r.json()).then(d => {
+    localApiFetch('/api/shortcut').then(r => r.json()).then(d => {
         shortcutInput.value = d.key || 'CommandOrControl+Shift+T';
     }).catch(() => {});
 
@@ -2257,26 +2298,65 @@ if (isElectron) {
 
     shortcutInput.addEventListener('click', () => recordBtn.click());
 
-    document.addEventListener('keydown', (e) => {
-        if (!recording) return;
-        // 忽略纯修饰键（Command/Shift/Alt/Ctrl 单独按）
-        if (['Meta','Control','Shift','Alt','CapsLock','Tab','Escape'].includes(e.key)) return;
-        e.preventDefault();
-        e.stopPropagation();
-        const parts = [];
-        if (e.metaKey || e.ctrlKey) parts.push('CommandOrControl');
-        if (e.shiftKey) parts.push('Shift');
-        if (e.altKey) parts.push('Alt');
-        const keyName = e.key.length === 1 ? e.key.toUpperCase() : (e.code.startsWith('Key') ? e.code.slice(3) : e.key);
-        parts.push(keyName);
-        const shortcut = parts.join('+');
-        shortcutInput.value = shortcut;
+    const specialShortcutKeys = {
+        ArrowUp: 'Up', ArrowDown: 'Down', ArrowLeft: 'Left', ArrowRight: 'Right',
+        ' ': 'Space', Backspace: 'Backspace', Delete: 'Delete', Insert: 'Insert',
+        Home: 'Home', End: 'End', PageUp: 'PageUp', PageDown: 'PageDown',
+        Enter: 'Enter'
+    };
+
+    function resetShortcutRecorder() {
         recording = false;
         recordBtn.textContent = '🎹 录制';
         recordBtn.style.borderColor = '';
         recordBtn.style.background = '';
+    }
 
-        fetch('/api/shortcut', {
+    function getShortcutKeyName(e) {
+        if (e.code.startsWith('Key')) return e.code.slice(3);
+        if (e.code.startsWith('Digit')) return e.code.slice(5);
+        if (/^F([1-9]|1[0-9]|2[0-4])$/.test(e.key)) return e.key;
+        return specialShortcutKeys[e.key] || null;
+    }
+
+    document.addEventListener('keydown', (e) => {
+        if (!recording) return;
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            e.stopPropagation();
+            resetShortcutRecorder();
+            localApiFetch('/api/shortcut').then(r => r.json()).then(d => {
+                shortcutInput.value = d.key || 'CommandOrControl+Shift+T';
+            }).catch(() => {});
+            return;
+        }
+        // 等待用户在修饰键之后按下实际按键。
+        if (['Meta', 'Control', 'Shift', 'Alt'].includes(e.key)) return;
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (!e.metaKey && !e.ctrlKey && !e.altKey) {
+            showToast('全局快捷键至少需要 Command、Control 或 Alt', 'error');
+            return;
+        }
+
+        const keyName = getShortcutKeyName(e);
+        if (!keyName) {
+            showToast(`不支持按键: ${e.key}`, 'error');
+            return;
+        }
+
+        const parts = [];
+        if (e.metaKey) parts.push('Command');
+        if (e.ctrlKey) parts.push('Control');
+        if (e.shiftKey) parts.push('Shift');
+        if (e.altKey) parts.push('Alt');
+        parts.push(keyName);
+        const shortcut = parts.join('+');
+        shortcutInput.value = shortcut;
+        resetShortcutRecorder();
+
+        localApiFetch('/api/shortcut', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ key: shortcut })
@@ -2287,7 +2367,7 @@ if (isElectron) {
         }).then(d => {
             showToast(`快捷键已更新: ${d.key}`, 'success');
         }).catch(err => showToast(`保存失败: ${err.message}`, 'error'));
-    });
+    }, true);
 }
 
 // ====== Init ======
@@ -2301,5 +2381,7 @@ updateModelBadge();
 updateCounts();
 sourceText.focus();
 </script>
+<ai_title style="display:none">可乐翻译助手桌面端</ai_title>
+<ai_summary style="display:none"><p>多模型翻译与代码命名工具</p><p>支持全局快捷键和 Markdown 翻译</p><p>包含桌面端安全设置与历史记录</p></ai_summary>
 </body>
 </html>

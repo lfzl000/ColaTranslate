@@ -3,6 +3,13 @@ let currentStyle = 'auto';
 let useStream = false;
 let userPickedTarget = false;  // 用户是否手动选择了目标语言
 
+function fetchWithTimeout(url, options = {}, timeoutMs = 120000) {
+    return fetch(url, {
+        ...options,
+        signal: options.signal || AbortSignal.timeout(timeoutMs)
+    });
+}
+
 // ====== DOM Elements ======
 const sourceLang = document.getElementById('sourceLang');
 const targetLang = document.getElementById('targetLang');
@@ -94,7 +101,7 @@ document.getElementById('fetchModelsBtn').addEventListener('click', async () => 
     hint.style.display = 'none';
 
     try {
-        const res = await fetch(`${base}/models`, {
+        const res = await fetchWithTimeout(`${base}/models`, {
             headers: { 'Authorization': `Bearer ${key}` }
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -103,7 +110,12 @@ document.getElementById('fetchModelsBtn').addEventListener('click', async () => 
 
         if (models.length) {
             const select = document.getElementById('modelSelect');
-            select.innerHTML = models.map(m => `<option value="${m}">${m}</option>`).join('');
+            select.replaceChildren(...models.map(model => {
+                const option = document.createElement('option');
+                option.value = String(model);
+                option.textContent = String(model);
+                return option;
+            }));
             select.style.display = '';
             document.getElementById('modelInput').style.display = 'none';
             select.addEventListener('change', () => {
@@ -128,9 +140,21 @@ document.getElementById('fetchModelsBtn').addEventListener('click', async () => 
     }
 });
 
-settingsClose.addEventListener('click', () => { settingsOverlay.style.display = 'none'; });
+function closeSettingsWithoutSaving() {
+    currentTheme = localStorage.getItem('ai-translator-theme') || 'system';
+    currentProvider = localStorage.getItem('ai-translator-provider') || 'deepseek';
+    const cfg = loadProviderConfig(currentProvider);
+    currentApiBase = cfg.apiBase;
+    currentApiKey = cfg.apiKey;
+    currentModel = cfg.model;
+    applyTheme(currentTheme);
+    updateModelBadge();
+    settingsOverlay.style.display = 'none';
+}
+
+settingsClose.addEventListener('click', closeSettingsWithoutSaving);
 settingsOverlay.addEventListener('click', (e) => {
-    if (e.target === settingsOverlay) settingsOverlay.style.display = 'none';
+    if (e.target === settingsOverlay) closeSettingsWithoutSaving();
     // Provider option click
     const popt = e.target.closest('#providerOptions .settings-option');
     if (popt) {
@@ -158,15 +182,6 @@ settingsOverlay.addEventListener('click', (e) => {
     }
 });
 
-// Theme option click
-settingsOverlay.addEventListener('click', (e) => {
-    const opt = e.target.closest('.settings-option');
-    if (!opt) return;
-    currentTheme = opt.dataset.theme;
-    document.querySelectorAll('.settings-option').forEach(o => o.classList.remove('active'));
-    opt.classList.add('active');
-});
-
 // API key hint
 apiKeyInput.addEventListener('input', updateApiKeyHint);
 function updateApiKeyHint() {
@@ -185,9 +200,8 @@ settingsSave.addEventListener('click', () => {
     const newBase = isOpenAI
         ? ((document.getElementById('apiBaseInput')?.value || '').trim() || 'https://api.openai.com/v1')
         : 'https://api.deepseek.com/v1';
-    const newModel = isOpenAI
-        ? ((document.getElementById('modelInput')?.value || '').trim() || 'gpt-4o-mini')
-        : 'deepseek-v4-flash';
+    const newModel = (document.getElementById('modelInput')?.value || '').trim()
+        || (isOpenAI ? 'gpt-4o-mini' : 'deepseek-v4-flash');
 
     currentApiKey = newKey;
     currentApiBase = newBase;
@@ -205,7 +219,7 @@ settingsSave.addEventListener('click', () => {
 // Esc to close
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && settingsOverlay.style.display === 'flex') {
-        settingsOverlay.style.display = 'none';
+        closeSettingsWithoutSaving();
     }
 });
 
@@ -438,7 +452,7 @@ function saveProviderConfig(provider, apiKey, apiBase, model) {
     }
 }
 
-const defaultCfg = loadProviderConfig('deepseek');
+const defaultCfg = loadProviderConfig(currentProvider);
 let currentApiBase = defaultCfg.apiBase;
 let currentApiKey = defaultCfg.apiKey;
 let currentModel = defaultCfg.model;
@@ -475,7 +489,7 @@ ${styleGuide}
 }
 
 async function normalTranslate(text, src, tgt) {
-    const res = await fetch(getApiUrl(), {
+    const res = await fetchWithTimeout(getApiUrl(), {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -494,7 +508,7 @@ async function normalTranslate(text, src, tgt) {
 
     if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error?.message || `HTTP ${res.status}`);
+        throw new Error(err.error || err.detail || `HTTP ${res.status}`);
     }
 
     const data = await res.json();
@@ -508,7 +522,7 @@ async function streamTranslate(text, src, tgt) {
     targetText.classList.add('streaming-cursor');
     let fullText = '';
 
-    const res = await fetch(getApiUrl(), {
+    const res = await fetchWithTimeout(getApiUrl(), {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -529,7 +543,7 @@ async function streamTranslate(text, src, tgt) {
     if (!res.ok) {
         targetText.classList.remove('streaming-cursor');
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error?.message || `HTTP ${res.status}`);
+        throw new Error(err.error || err.detail || `HTTP ${res.status}`);
     }
 
     const reader = res.body.getReader();
@@ -656,7 +670,7 @@ async function generateName() {
     namingResults.innerHTML = '<div class="naming-placeholder" style="padding:1.5rem">⏳ 正在生成命名方案...</div>';
 
     try {
-        const res = await fetch(getApiUrl(), {
+        const res = await fetchWithTimeout(getApiUrl(), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -698,7 +712,7 @@ async function generateName() {
 
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));
-            throw new Error(err.error?.message || `HTTP ${res.status}`);
+            throw new Error(err.error || err.detail || `HTTP ${res.status}`);
         }
 
         const data = await res.json();
@@ -710,7 +724,7 @@ async function generateName() {
         const namingText = window._lastCandidates.map(c => `${c.label || '方案'}：${c.camelCase} / ${c.PascalCase} / ${c.snake_case} / ${c['kebab-case']} - ${c.explanation}`).join('\n');
         addHistory('naming', text, namingText, 'zh', 'en');
     } catch (err) {
-        namingResults.innerHTML = `<div class="naming-placeholder" style="padding:1.5rem;color:var(--danger)">❌ ${err.message}</div>`;
+        namingResults.innerHTML = `<div class="naming-placeholder" style="padding:1.5rem;color:var(--danger)">❌ ${escapeHtml(err.message)}</div>`;
     }
 }
 
@@ -747,14 +761,14 @@ function renderCandidates(candidates) {
 
         const chips = casings.map(cs => {
             const val = c[cs.key] || '-';
-            return `<span class="casing-chip" data-value="${escapeHtml(val)}" title="点击复制">
+            return `<span class="casing-chip" data-value="${escapeAttribute(val)}" title="点击复制">
                 <span class="case-type">${cs.emoji} ${cs.label}</span> ${escapeHtml(val)}
             </span>`;
         }).join('');
 
         return `<div class="candidate-card">
             <div class="candidate-header">
-                <span class="candidate-label ${labelClass}">${labelText}</span>
+                <span class="candidate-label ${labelClass}">${escapeHtml(labelText)}</span>
             </div>
             <div class="candidate-casings">${chips}</div>
             <div class="candidate-explanation">💡 ${escapeHtml(c.explanation || '')}</div>
@@ -786,7 +800,7 @@ async function doBatchNaming(lines) {
     document.getElementById('formatSelector').style.display = 'none';
 
     try {
-        const res = await fetch(getApiUrl(), {
+        const res = await fetchWithTimeout(getApiUrl(), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentApiKey}` },
             body: JSON.stringify({
@@ -797,7 +811,7 @@ async function doBatchNaming(lines) {
                 temperature: 0.3, max_tokens: 4096, response_format: { type: 'json_object' }
             })
         });
-        if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error?.message || res.statusText); }
+        if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || e.detail || res.statusText); }
         const data = await res.json();
         const result = safeJSONParse(data.choices?.[0]?.message?.content?.trim() || '', { items: [] });
         window._lastBatchResults = result.items || [];
@@ -807,7 +821,7 @@ async function doBatchNaming(lines) {
         addHistory('naming', lines.join('\n'), batchText, 'zh', 'en');
         showToast(`已生成 ${window._lastBatchResults.length} 个命名方案`, 'success');
     } catch (err) {
-        namingResults.innerHTML = `<div class="naming-placeholder" style="padding:1.5rem;color:var(--danger)">❌ ${err.message}</div>`;
+        namingResults.innerHTML = `<div class="naming-placeholder" style="padding:1.5rem;color:var(--danger)">❌ ${escapeHtml(err.message)}</div>`;
     }
 }
 
@@ -822,7 +836,7 @@ function renderBatchResults(items) {
     const html = items.map(item => `
         <div class="naming-row" style="flex-wrap:wrap;gap:0.5rem">
             <span style="font-weight:600;min-width:80px;color:var(--text);font-size:0.85rem">${escapeHtml(item.chinese)}</span>
-            ${casings.map(c => `<span class="casing-chip" data-value="${escapeHtml(item[c] || '-')}"><span class="case-type">${labels[c]}</span> ${escapeHtml(item[c] || '-')}</span>`).join('')}
+            ${casings.map(c => `<span class="casing-chip" data-value="${escapeAttribute(item[c] || '-')}"><span class="case-type">${labels[c]}</span> ${escapeHtml(item[c] || '-')}</span>`).join('')}
         </div>
     `).join('');
     namingResults.innerHTML = html;
@@ -873,7 +887,7 @@ mdTranslateBtn.addEventListener('click', async () => {
     mdTargetText.textContent = '';
 
     try {
-        const res = await fetch(getApiUrl(), {
+        const res = await fetchWithTimeout(getApiUrl(), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentApiKey}` },
             body: JSON.stringify({
@@ -888,7 +902,7 @@ mdTranslateBtn.addEventListener('click', async () => {
                 temperature: 0.3, max_tokens: 8192
             })
         });
-        if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error?.message || res.statusText); }
+        if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || e.detail || res.statusText); }
         const data = await res.json();
         mdTargetText.textContent = data.choices?.[0]?.message?.content?.trim() || '';
         mdTargetCount.textContent = `${mdTargetText.textContent.length} 字符`;
@@ -903,8 +917,14 @@ mdTranslateBtn.addEventListener('click', async () => {
 
 function escapeHtml(str) {
     const div = document.createElement('div');
-    div.textContent = str;
+    div.textContent = String(str ?? '');
     return div.innerHTML;
+}
+
+function escapeAttribute(str) {
+    return String(str ?? '').replace(/[&<>"']/g, char => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[char]);
 }
 
 // Safe JSON parse with repair for common AI response issues
