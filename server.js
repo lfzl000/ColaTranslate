@@ -362,10 +362,22 @@ app.post('/api/proxy', async (req, res) => {
     }
 });
 
-app.listen(PORT, () => {
-    console.log(`🌐 AI 翻译工具已启动: http://localhost:${PORT}`);
-    console.log(`📡 DeepSeek API 代理就绪`);
-    if (!process.env.DEEPSEEK_API_KEY || process.env.DEEPSEEK_API_KEY === 'sk-your-api-key-here') {
-        console.warn('⚠️  请先配置 .env 中的 DEEPSEEK_API_KEY');
-    }
-});
+function startServer(port) {
+    return new Promise((resolve, reject) => {
+        const p = port || PORT;
+        const server = app.listen(p, () => {
+            console.log(`🐕 可乐翻译助手: http://localhost:${p}`);
+            resolve(p);
+        });
+        server.on('error', reject);
+    });
+}
+
+// 直接运行 node server.js 时自动启动
+if (require.main === module) {
+    startServer().then(port => {
+        console.log(`📡 API 代理已就绪`);
+    });
+}
+
+module.exports = { startServer };

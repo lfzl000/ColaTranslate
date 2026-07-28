@@ -1,15 +1,36 @@
 {
-  "name": "ai-translator",
-  "version": "1.0.0",
-  "description": "AI-powered web translation tool with DeepSeek API",
-  "main": "server.js",
+  "name": "cola-translate",
+  "version": "1.1.0",
+  "description": "AI-powered translation & code naming tool",
+  "main": "main.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "app": "electron .",
+    "build": "electron-builder --mac --dir",
+    "dist": "electron-builder --mac"
+  },
+  "build": {
+    "appId": "com.cola.translate",
+    "productName": "可乐翻译助手",
+    "mac": {
+      "category": "public.app-category.utilities",
+      "icon": "extension/icons/icon128.png",
+      "target": ["dmg", "zip"]
+    },
+    "files": [
+      "main.js",
+      "server.js",
+      "public/**/*",
+      "extension/icons/**/*"
+    ]
   },
   "dependencies": {
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.0"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
   }
 }
