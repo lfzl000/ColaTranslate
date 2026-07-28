@@ -34,7 +34,11 @@ function createTray() {
   tray.on('double-click', showWindow);
 }
 
-function showWindow() {
+async function showWindow() {
+  if (process.platform === 'darwin' && app.dock && !app.dock.isVisible()) {
+    try { await app.dock.show(); }
+    catch (err) { console.error('恢复 Dock 图标失败:', err.message); }
+  }
   if (mainWindow) {
     mainWindow.show();
     mainWindow.focus();
@@ -77,12 +81,15 @@ async function createWindow() {
   });
 
   mainWindow.loadURL(`http://127.0.0.1:${serverPort}?electron=1`);
-  mainWindow.setTitle('🐕 可乐翻译助手');
+  mainWindow.setTitle('可乐翻译助手');
 
   mainWindow.on('close', (e) => {
     if (!isQuitting) {
       e.preventDefault();
       mainWindow.hide();
+      if (process.platform === 'darwin' && app.dock) {
+        app.dock.hide().catch((err) => console.error('隐藏 Dock 图标失败:', err.message));
+      }
     }
   });
   mainWindow.on('closed', () => { mainWindow = null; });
@@ -137,6 +144,9 @@ if (!hasSingleInstanceLock) {
   app.on('second-instance', showWindow);
   app.whenReady().then(() => {
     userDataPath = app.getPath('userData');
+    if (process.platform === 'darwin' && app.dock) {
+      app.dock.setIcon(getIcon('icon512.png'));
+    }
     createTray();
     setShortcutCallback(registerShortcut);
     createWindow().then(() => {

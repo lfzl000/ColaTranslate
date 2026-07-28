@@ -4,6 +4,9 @@ const fs = require('fs');
 const path = require('path');
 
 const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
+const sidepanelHtml = fs.readFileSync(path.join(__dirname, '..', 'extension', 'sidepanel.html'), 'utf8');
+const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'extension', 'manifest.json'), 'utf8'));
+const mainProcess = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
 
 function functionBody(name, nextMarker) {
     const start = html.indexOf(`function ${name}`);
@@ -33,4 +36,20 @@ test('dynamic values use attribute-aware escaping and deployment metadata is pre
     assert.match(html, /data-value="\$\{escapeAttribute\(/);
     assert.match(html, /<ai_title style="display:none">/);
     assert.match(html, /<ai_summary style="display:none">/);
+});
+
+test('brand icon is used by the Web page and Chrome extension surfaces', () => {
+    assert.match(html, /href="\/icons\/icon48\.png"/);
+    assert.match(html, /src="\/icons\/icon128\.png"/);
+    assert.match(sidepanelHtml, /href="icons\/icon48\.png"/);
+    assert.match(sidepanelHtml, /src="icons\/icon128\.png"/);
+    assert.equal(manifest.action.default_icon['16'], 'icons/icon16.png');
+    assert.equal(manifest.action.default_icon['48'], 'icons/icon48.png');
+    assert.equal(manifest.action.default_icon['128'], 'icons/icon128.png');
+});
+
+test('macOS hides the Dock icon with the window and restores it when showing', () => {
+    assert.match(mainProcess, /app\.dock\.hide\(\)/);
+    assert.match(mainProcess, /await app\.dock\.show\(\)/);
+    assert.match(mainProcess, /app\.dock\.setIcon\(getIcon\('icon512\.png'\)\)/);
 });

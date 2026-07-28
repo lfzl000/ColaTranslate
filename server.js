@@ -14,6 +14,7 @@ app.use('/api', (req, res, next) => {
     if (!apiToken || req.get('X-Cola-Token') === apiToken) return next();
     return res.status(403).json({ error: '无权访问本地 API' });
 });
+app.use('/icons', express.static(path.join(__dirname, 'extension', 'icons')));
 app.use(express.static(path.join(__dirname, 'public')));
 
 function normalizeApiBase(value, fallback) {
