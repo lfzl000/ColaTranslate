@@ -386,9 +386,18 @@ app.get('/api/shortcut', (req, res) => {
 app.post('/api/shortcut', (req, res) => {
     const { key } = req.body;
     if (!key) return res.status(400).json({ error: '缺少 key' });
-    fs.writeFileSync(shortcutPath, JSON.stringify({ key }));
-    if (onShortcutChange) onShortcutChange(key);
-    res.json({ ok: true, key });
+    try {
+        fs.writeFileSync(shortcutPath, JSON.stringify({ key }));
+        res.json({ ok: true, key });
+        // 异步回调，避免阻塞响应
+        if (onShortcutChange) setImmediate(() => {
+            try { onShortcutChange(key); }
+            catch (err) { console.error('快捷键回调失败:', err.message); }
+        });
+    } catch (err) {
+        console.error('快捷键保存失败:', err.message);
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // 直接运行 node server.js 时自动启动
