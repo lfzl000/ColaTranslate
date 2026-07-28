@@ -363,11 +363,16 @@ app.post('/api/proxy', async (req, res) => {
     }
 });
 
-function startServer(port) {
+function startServer(port, options = {}) {
     return new Promise((resolve, reject) => {
         const p = port || PORT;
         const server = app.listen(p, () => {
             console.log(`🐕 可乐翻译助手: http://localhost:${p}`);
+            // 初始化快捷键存储路径（Electron 打包后不能在 asar 里写）
+            shortcutPath = options.userDataPath
+                ? path.join(options.userDataPath, '.shortcut.json')
+                : path.join(__dirname, '.shortcut.json');
+            console.log(`快捷键配置路径: ${shortcutPath}`);
             resolve(p);
         });
         server.on('error', reject);
@@ -378,7 +383,7 @@ function startServer(port) {
 let onShortcutChange = null;
 function setShortcutCallback(cb) { onShortcutChange = cb; }
 
-const shortcutPath = path.join(__dirname, '.shortcut.json');
+let shortcutPath = path.join(__dirname, '.shortcut.json');
 app.get('/api/shortcut', (req, res) => {
     try { res.json(JSON.parse(fs.readFileSync(shortcutPath, 'utf8'))); }
     catch { res.json({ key: 'CommandOrControl+Shift+T' }); }

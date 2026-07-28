@@ -7,9 +7,14 @@ let mainWindow;
 let tray = null;
 let serverPort = 3456;
 let isQuitting = false;
+let userDataPath;
 
 function getIcon(name) {
   return path.join(__dirname, 'extension', 'icons', name);
+}
+
+function getShortcutPath() {
+  return path.join(userDataPath, '.shortcut.json');
 }
 
 function createTray() {
@@ -34,7 +39,7 @@ function showWindow() {
 
 async function createWindow() {
   try {
-    serverPort = await startServer();
+    serverPort = await startServer(undefined, { userDataPath });
     console.log(`服务已启动: http://localhost:${serverPort}`);
   } catch (err) {
     console.error('服务启动失败:', err);
@@ -70,25 +75,27 @@ async function createWindow() {
 function registerShortcut(key) {
   const shortcut = key || loadDefaultShortcut();
   globalShortcut.unregisterAll();
-  try {
-    globalShortcut.register(shortcut, showWindow);
+  const ok = globalShortcut.register(shortcut, showWindow);
+  if (ok) {
     console.log(`全局快捷键已注册: ${shortcut}`);
-  } catch (err) {
-    console.error(`快捷键注册失败 (${shortcut}):`, err.message);
+  } else {
+    console.error(`快捷键注册失败: ${shortcut}（可能与其他应用冲突）`);
     const fallback = 'CommandOrControl+Shift+T';
-    globalShortcut.register(fallback, showWindow);
-    console.log(`回退到: ${fallback}`);
+    if (globalShortcut.register(fallback, showWindow)) {
+      console.log(`回退到: ${fallback}`);
+    }
   }
 }
 
 function loadDefaultShortcut() {
-  try { return JSON.parse(fs.readFileSync(path.join(__dirname, '.shortcut.json'), 'utf8')).key; }
+  try { return JSON.parse(fs.readFileSync(getShortcutPath(), 'utf8')).key; }
   catch { return 'CommandOrControl+Shift+T'; }
 }
 
 app.whenReady().then(() => {
+  userDataPath = app.getPath('userData');
   createTray();
-  setShortcutCallback(registerShortcut); // 服务端通知直接回调
+  setShortcutCallback(registerShortcut);
   createWindow().then(() => {
     registerShortcut(loadDefaultShortcut());
   });
