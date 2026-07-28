@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 require('dotenv').config();
 
 const app = express();
@@ -379,5 +380,18 @@ if (require.main === module) {
         console.log(`📡 API 代理已就绪`);
     });
 }
+
+// 全局快捷键配置（仅 Electron 使用）
+const shortcutPath = path.join(__dirname, '.shortcut.json');
+app.get('/api/shortcut', (req, res) => {
+    try { res.json(JSON.parse(fs.readFileSync(shortcutPath, 'utf8'))); }
+    catch { res.json({ key: 'CommandOrControl+Shift+T' }); }
+});
+app.post('/api/shortcut', (req, res) => {
+    const { key } = req.body;
+    if (!key) return res.status(400).json({ error: '缺少 key' });
+    fs.writeFileSync(shortcutPath, JSON.stringify({ key }));
+    res.json({ ok: true, key });
+});
 
 module.exports = { startServer };

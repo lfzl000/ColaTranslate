@@ -1139,6 +1139,14 @@ body::before {
                     密钥仅保存在浏览器本地，不会上传到服务器
                 </div>
             </div>
+            <div class="settings-group" id="shortcutGroup" style="display:none">
+                <label class="settings-label">⌨️ 全局快捷键（显示/隐藏窗口）</label>
+                <div style="display:flex;gap:0.5rem">
+                    <input type="text" class="settings-input" id="shortcutInput" placeholder="CommandOrControl+Shift+T" readonly style="cursor:pointer;text-align:center;font-size:0.85rem;font-weight:600;">
+                    <button class="settings-fetch-btn" id="recordShortcutBtn" style="width:auto;padding:0.45rem 0.8rem;flex-shrink:0;">🎹 录制</button>
+                </div>
+                <div class="settings-hint">点击"录制"后按下组合键，支持 Ctrl/Shift/Alt/Meta + 字母</div>
+            </div>
         </div>
         <div class="settings-footer">
             <button class="settings-save" id="settingsSave">保存设置</button>
@@ -2236,6 +2244,59 @@ historyList.addEventListener('click', (e) => {
         showToast('已恢复历史记录');
     }, 100);
 });
+
+// ====== Global Shortcut (Electron only) ======
+const isElectron = window.location.search.includes('electron=1');
+if (isElectron) {
+    document.getElementById('shortcutGroup').style.display = '';
+    const shortcutInput = document.getElementById('shortcutInput');
+    const recordBtn = document.getElementById('recordShortcutBtn');
+    let recording = false;
+
+    // 加载当前快捷键
+    fetch('/api/shortcut').then(r => r.json()).then(d => {
+        shortcutInput.value = d.key || 'CommandOrControl+Shift+T';
+    }).catch(() => {});
+
+    recordBtn.addEventListener('click', () => {
+        if (recording) return;
+        recording = true;
+        recordBtn.textContent = '🎤 请按键…';
+        recordBtn.style.borderColor = 'var(--primary)';
+        recordBtn.style.background = 'var(--primary-glow)';
+        shortcutInput.value = '';
+    });
+
+    shortcutInput.addEventListener('click', () => recordBtn.click());
+
+    document.addEventListener('keydown', (e) => {
+        if (!recording) return;
+        e.preventDefault();
+        const parts = [];
+        if (e.metaKey || e.ctrlKey) parts.push('CommandOrControl');
+        if (e.shiftKey) parts.push('Shift');
+        if (e.altKey) parts.push('Alt');
+        const keyName = e.key.length === 1 ? e.key.toUpperCase() : e.key;
+        parts.push(keyName);
+        const shortcut = parts.join('+');
+        if (/CommandOrControl\+Shift\+T/.test(shortcut)) {
+        }
+        shortcutInput.value = shortcut;
+        recording = false;
+        recordBtn.textContent = '🎹 录制';
+        recordBtn.style.borderColor = '';
+        recordBtn.style.background = '';
+
+        // 保存到后端
+        fetch('/api/shortcut', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key: shortcut })
+        }).then(r => r.json()).then(d => {
+            showToast(`快捷键已更新: ${d.key}`, 'success');
+        }).catch(() => showToast('快捷键保存失败', 'error'));
+    });
+}
 
 // ====== Init ======
 function updateModelBadge() {
