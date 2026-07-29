@@ -88,7 +88,8 @@ async function createWindow() {
       e.preventDefault();
       mainWindow.hide();
       if (process.platform === 'darwin' && app.dock) {
-        app.dock.hide().catch((err) => console.error('隐藏 Dock 图标失败:', err.message));
+        try { app.dock.hide(); }
+        catch (err) { console.error('隐藏 Dock 图标失败:', err.message); }
       }
     }
   });

@@ -50,6 +50,7 @@ test('brand icon is used by the Web page and Chrome extension surfaces', () => {
 
 test('macOS hides the Dock icon with the window and restores it when showing', () => {
     assert.match(mainProcess, /app\.dock\.hide\(\)/);
+    assert.doesNotMatch(mainProcess, /app\.dock\.hide\(\)\.catch/);
     assert.match(mainProcess, /await app\.dock\.show\(\)/);
     assert.match(mainProcess, /app\.dock\.setIcon\(getIcon\('icon512\.png'\)\)/);
 });
