@@ -49,8 +49,14 @@ test('brand icon is used by the Web page and Chrome extension surfaces', () => {
 });
 
 test('macOS hides the Dock icon with the window and restores it when showing', () => {
+    const showWindowStart = mainProcess.indexOf('function showWindow()');
+    const showWindowEnd = mainProcess.indexOf('async function createWindow()', showWindowStart);
+    const showWindowBody = mainProcess.slice(showWindowStart, showWindowEnd);
+
     assert.match(mainProcess, /app\.dock\.hide\(\)/);
     assert.doesNotMatch(mainProcess, /app\.dock\.hide\(\)\.catch/);
-    assert.match(mainProcess, /await app\.dock\.show\(\)/);
+    assert.match(showWindowBody, /app\.dock\.show\(\)\.catch/);
+    assert.doesNotMatch(showWindowBody, /await app\.dock\.show\(\)/);
+    assert.ok(showWindowBody.indexOf('mainWindow.show()') < showWindowBody.indexOf('app.dock.show()'));
     assert.match(mainProcess, /app\.dock\.setIcon\(getIcon\('icon512\.png'\)\)/);
 });

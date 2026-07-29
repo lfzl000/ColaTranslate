@@ -34,14 +34,13 @@ function createTray() {
   tray.on('double-click', showWindow);
 }
 
-async function showWindow() {
-  if (process.platform === 'darwin' && app.dock && !app.dock.isVisible()) {
-    try { await app.dock.show(); }
-    catch (err) { console.error('恢复 Dock 图标失败:', err.message); }
-  }
+function showWindow() {
   if (mainWindow) {
     mainWindow.show();
     mainWindow.focus();
+  }
+  if (process.platform === 'darwin' && app.dock && !app.dock.isVisible()) {
+    app.dock.show().catch((err) => console.error('恢复 Dock 图标失败:', err.message));
   }
 }
 
